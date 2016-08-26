@@ -78,42 +78,55 @@ ggplot(all_data, aes(x = per_cap_income, y = pct_comm)) + geom_point(alpha = 0.3
 ## caret modeling attempts
 #prepare data for training
 
+#feature extraction to add binaries?
 model_data <- all_data %>% ungroup() %>% select(-(year:tot_volume))
 model_data <- na.omit(model_data)
+
 
 inTraining <- createDataPartition(model_data$pct_comm, p = .8, list = FALSE)
 training <- model_data[inTraining,]
 testing <- model_data[-inTraining,]
+
+#preprocess? do this in the train function or before?
+preProcValues <- preProcess(training, method = c("center", "scale", "pca"))
+
+trainingTransformed <- predict(preProcValues, training)
+testingTransformed <- predict(preProcValues, testing)
+
+#how to choose number and repeats for repeated cross validation?
 fitControl <- trainControl(method = "repeatedcv",
                            number = 10,
-                           repeats = 10)
-## set.seed??
-Fit1 <- train(pct_comm ~ ., data = model_data,
+                           repeats = 5)
+
+## set.seed causes you to get same results each time? necessary?
+#Use PCA to transform data to a smaller sub-space where the new variables are
+#uncorrelated with one another. Forces scaling of the predictors. Changes
+#column names to PC1, PC2, etc. How do I interpret these variables?
+#What does increasing or decreasing thresh do? 
+#
+
+#Use data = training or or model_data? Define preProcess again? 
+#add a metric to minimize or maximize?
+Fit1 <- train(pct_comm ~ ., data = training,
               method = "lm",
               trControl = fitControl,
               preProcess = c("pca"))
 
-Fit2 <- train(pct_comm ~., data = model_data, method = "lm")
 
-##attempting to remove variables to improve model
-fit3 <- train(pct_comm ~ ., data = na.omit(select(model_data, -pct_single_moth_houses, - pct_SNAP)), method = "lm")
-summary(fit3)
-fit4 <- train(pct_comm ~ ., data = na.omit(select(model_data, -pct_single_moth_houses, -pct_SNAP, -median_household_income, -mean_household_income, -mean_fam_income, -per_cap_income, -median_worker_earnings)), method = "lm")
-summary(fit4)
-varImp(fit4)
-fit5 <- train(pct_comm ~ ., data = na.omit(select(model_data, -pct_single_moth_houses, -pct_SNAP, -median_household_income, -mean_household_income, -mean_fam_income, -per_cap_income, -median_worker_earnings, -pct_over65)), method = "lm")
-summary(fit5)
-fit5 <- train(pct_comm ~ ., data = na.omit(select(model_data, -pct_single_moth_houses, -pct_SNAP, -median_household_income, -mean_household_income, -mean_fam_income, -per_cap_income, -median_worker_earnings, -pct_over65, -pct_wh_hisp)), method = "lm")
-summary(fit5)
-fit6 <- train(pct_comm ~ ., data = na.omit(select(model_data, -pct_single_moth_houses, -pct_SNAP, -median_household_income, -mean_household_income, -mean_fam_income, -per_cap_income, -median_worker_earnings, -pct_over65, -pct_wh_hisp, -pct_private_ins)), method = "lm")
-summary(fit6)
-fit6 <- train(pct_comm ~ ., data = na.omit(select(model_data, -pct_single_moth_houses, -pct_SNAP, -median_household_income, -mean_household_income, -mean_fam_income, -per_cap_income, -median_worker_earnings, -pct_over65, -pct_wh_hisp, -pct_public_ins, -pct_no_ins)), method = "lm")
-summary(fit6)
-fit7 <- train(pct_comm ~ ., data = na.omit(select(model_data, -pct_single_moth_houses, -pct_SNAP, -median_household_income, -mean_household_income, -mean_fam_income, -per_cap_income, -median_worker_earnings, -pct_over65, -pct_wh_hisp, -pct_public_ins, -pct_no_ins, -pct_unemployed)), method = "lm")
-summary(fit7)
-fit8 <- train(pct_comm ~ ., data = na.omit(select(model_data, -pct_single_moth_houses, -pct_SNAP, -median_household_income, -mean_household_income, -mean_fam_income, -per_cap_income, -median_worker_earnings, -pct_over65, -pct_wh_hisp, -pct_public_ins, -pct_no_ins, -pct_unemployed, - pct_poverty)), method = "lm")
-summary(fit8)
-fit9 <- train(pct_comm ~ ., data = na.omit(select(model_data, -pct_single_moth_houses, -pct_SNAP, -median_household_income, -mean_household_income, -mean_fam_income, -per_cap_income, -median_worker_earnings, -pct_over65, -pct_wh_hisp, -pct_public_ins, -pct_no_ins, -pct_unemployed, - pct_poverty, - pct_black, -pct_hisp)), method = "lm")
-summary(fit9)
-fit10 <- train(pct_comm ~ ., data = na.omit(select(model_data, -pct_single_moth_houses, -pct_SNAP, -median_household_income, -mean_household_income, -mean_fam_income, -per_cap_income, -median_worker_earnings, -pct_over65, -pct_wh_hisp, -pct_public_ins, -pct_no_ins, -pct_unemployed, - pct_poverty, - pct_black, -pct_hisp, -MSSA_desig)), method = "lm")
-summary(fit10)
+
+##from https://rpubs.com/njvijay/27823 - a function to display all PCA related plots in 2X2 grid
+pcaCharts <- function(x) {
+  x.var <- x$sdev ^ 2
+  x.pvar <- x.var/sum(x.var)
+  print("proportions of variance:")
+  print(x.pvar)
+  
+  par(mfrow=c(2,2))
+  plot(x.pvar,xlab="Principal component", ylab="Proportion of variance explained", ylim=c(0,1), type='b')
+  plot(cumsum(x.pvar),xlab="Principal component", ylab="Cumulative Proportion of variance explained", ylim=c(0,1), type='b')
+  screeplot(x)
+  screeplot(x,type="l")
+  par(mfrow=c(1,1))
+}
+
+pcaCharts(prcomp(trainingTransformed, center = FALSE))
