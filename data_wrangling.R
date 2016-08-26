@@ -4,6 +4,8 @@ library(readr)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(caret)
+
 
 #Define data sources
 census_file <- "2010_Census_Demographics_CA.csv"
@@ -75,14 +77,14 @@ ggplot(pct_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
 ggplot(all_data, aes(x = per_cap_income, y = pct_comm)) + geom_point(alpha = 0.3) + geom_smooth(method = lm)
 
 
-## caret modeling attempts
+### caret modeling attempts
+
 #prepare data for training
 
-#feature extraction to add binaries?
 model_data <- all_data %>% ungroup() %>% select(-(year:tot_volume))
 model_data <- na.omit(model_data)
 
-
+#80% of data for training too high?
 inTraining <- createDataPartition(model_data$pct_comm, p = .8, list = FALSE)
 training <- model_data[inTraining,]
 testing <- model_data[-inTraining,]
@@ -110,7 +112,7 @@ fitControl <- trainControl(method = "repeatedcv",
 Fit1 <- train(pct_comm ~ ., data = training,
               method = "lm",
               trControl = fitControl,
-              preProcess = c("pca"))
+              preProcess = c("center", "scale", "pca"))
 
 
 
@@ -130,3 +132,8 @@ pcaCharts <- function(x) {
 }
 
 pcaCharts(prcomp(trainingTransformed, center = FALSE))
+
+#test model
+testPred <- predict(Fit1, testing)
+postResample(testPred, testing$pct_comm)
+
