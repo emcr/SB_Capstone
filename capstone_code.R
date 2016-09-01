@@ -30,7 +30,7 @@ census <- census %>% select(geo = X3,
                             pct_hisp = X231,
                             pct_nonhisp_wh = X249,
                             pct_married_houses = X309,
-                            pct_single_moth_houses = X319) %>%
+                            pct_sing_mother_houses = X319) %>%
   mutate(geo = tolower(geo))
   census <-  mutate(census, geo = sub(" county, california$", "", x = census$geo))
   census <-  mutate(census, geo = sub("^zcta5 ", "", x = census$geo))
@@ -108,13 +108,22 @@ all_data <- filter(all_data, !is.na(pct_labor_force))
 
 #Plot all percent variables vs pct_comm faceted by facility ownership
 pct_table <- select(all_data, year:location, starts_with("pct_"))
-pct_table_long <- gather(pct_table, "stat", "value", pct_labor_force:pct_single_moth_houses)
-ggplot(pct_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + geom_point(alpha = 0.3) + geom_smooth(se = FALSE, size = 2, method = lm) + xlab("value (as % of population)") + ylab("percent commercial patients") + facet_grid(. ~ owner)
+pct_table_long <- gather(pct_table, "stat", "value", pct_labor_force:pct_sing_mother_houses)
+ggplot(pct_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+  geom_point(alpha = 0.3) + 
+  geom_smooth(se = FALSE, size = 2, method = lm) + 
+  xlab("value (as % of population)") + 
+  ylab("percent commercial patients") + 
+  facet_grid(. ~ owner)
 
 #Plot all income or earnings variables vs pct_comm faceted by facility ownership
 inc_table <- select(all_data, year:location, pct_comm, contains("income"), contains("earnings"))
 inc_table_long <- gather(inc_table, "stat", "value", median_household_income:median_worker_earnings)
-ggplot(inc_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + geom_point(alpha = 0.3) + geom_smooth(se = FALSE, size = 2, method = lm) + xlab("value") + ylab("percent commercial patients") + facet_grid(. ~ owner)
+ggplot(inc_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+  geom_point(alpha = 0.3) + 
+  geom_smooth(se = FALSE, size = 2, method = lm) + 
+  xlab("value") + ylab("percent commercial patients") + 
+  facet_grid(. ~ owner)
 
 # MODELING
 
@@ -125,7 +134,7 @@ model_data <- all_data %>%
   select(pct_comm, 
          MSSA_desig, 
          owner, 
-         pct_labor_force:pct_single_moth_houses)
+         pct_labor_force:pct_sing_mother_houses)
 
 #Create dummy variables for MSSA_design and owner categories -- why is intercept column created?
 model_data <- tbl_df(model.matrix( ~ ., model.frame(~., data = model_data, na.action = na.pass)))
@@ -151,10 +160,7 @@ trainingTransformed <- predict(impute_NAs, training)
 testingTransformed <- predict(impute_NAs, testing)
 
 
-#Set resampling method to repeated cross validation
-fitControl <- trainControl(method = "repeatedcv",
-                           number = 10,
-                           repeats = 5)
+
 
 # FEATURE SELECTION
 
@@ -175,23 +181,42 @@ points(4, reg_sum$cp[4], pch = 20, col = "red")
 
 coef(regfit, 4)
 
+#Set resampling method to repeated cross validation
+fitControl <- trainControl(method = "repeatedcv",
+                           number = 10,
+                           repeats = 5)
+
 #Train linear model
 ## Selected variables using regsubsets. Tested all interactions but none were
 ## significant. Also tested these methods: 
 ## leapForward, leapBackward, lmStepAIC
 
-# set.seed again??
+set.seed(50) #Set seed again?
 Fit1 <- train(pct_comm ~ ownerNonprofit + 
                 ownerPublic + 
                 median_worker_earnings + 
-                pct_single_moth_houses, 
+                pct_sing_mother_houses, 
               data = trainingTransformed,
               method = "lm",
               trControl = fitControl)
-## Adding pct_labor_force, top_population, pct_married_houses increases R-squared,
+
+## Adding pct_labor_force, top_pop, pct_married_houses increases R-squared,
 ## but the p-values for added variables are all between .06 and .10
 
-#Test linear model
+set.seed(50) #Set seed again?
+Fit2 <- train(pct_comm ~ ownerNonprofit + 
+                ownerPublic + 
+                median_worker_earnings + 
+                pct_sing_mother_houses + 
+                pct_labor_force + 
+                tot_pop + 
+                pct_married_houses, 
+              data = trainingTransformed,
+              method = "lm",
+              trControl = fitControl)
+
+
+#Test linear model Fit1
 testPred <- predict(Fit1, testingTransformed)
 postResample(testPred, testingTransformed$pct_comm)
 
@@ -201,22 +226,29 @@ results <- bind_cols(tbl_df(testPred), tbl_df(testing$pct_comm))
 names(results) <- c("predicted", "actual")
 ggplot(results, aes(x = actual, y = predicted)) + geom_point() + geom_abline()
 
-#GBM Model
-gbmGrid <-  expand.grid(interaction.depth = c(1, 5, 9),
-                        n.trees = (1:30)*50,
-                        shrinkage = 0.1,
-                        n.minobsinnode = 20)
+#Test linear model Fit2
+testPred2 <- predict(Fit2, testingTransformed)
+postResample(testPred, testingTransformed$pct_comm)
 
+plot(testPred, testingTransformed$pct_comm)
+
+#GBM Model attempt
+gbmGrid <-  expand.grid(interaction.depth = seq(1, 7, by = 2),
+                        n.trees = seq(100, 1000, by = 50),
+                        shrinkage = c(0.01, 0.1),
+                        n.minobsinnode = 5)
+
+set.seed(50) #Set seed again?
 Fit_gbm <- train(pct_comm ~ .,
                  data = trainingTransformed,
                  method = "gbm",
                  trControl = fitControl, 
                  verbose = FALSE,
-                 tuneGrid = gbmGrid,
-                 metric = "Rsquared")
+                 tuneGrid = gbmGrid)
 
 testGBM <- predict(Fit_gbm, testingTransformed)
 postResample(testGBM, testingTransformed$pct_comm)
 
 plot(testGBM, testingTransformed$pct_comm)
+plot(Fit_gbm$finalModel)
 
