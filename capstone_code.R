@@ -5,12 +5,10 @@ if(getwd() == "C:/Users/emily_rinaldi/Desktop/R Projects/SB Capstone"){
 
 #Load all required packages
 library(readr)
+library(plyr)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
-library(caret)
-library(leaps)
-
 
 #Define data sources
 census_file <- "2010_Census_Demographics_CA.csv"
@@ -61,7 +59,7 @@ facilities <- read_csv(facilities_file,
 #Filter records to year with latest data available and transform into "tidy" format
 facilities <- facilities %>% 
   group_by(facility) %>% 
-  mutate(max_year = max(year)) %>% 
+  dplyr::mutate(max_year = max(year)) %>% 
   filter(year == max_year) %>% 
   spread(payor, volume) %>%
   mutate(tot_volume = `Medi-Cal` + Medicare + Other + `Private Coverage` + `Self Pay`, 
@@ -127,6 +125,9 @@ ggplot(inc_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) +
 
 # MODELING
 
+library(caret)
+library(leaps)
+
 #Prepare data for training
 
 model_data <- all_data %>% 
@@ -159,12 +160,9 @@ impute_NAs <- preProcess(training[,-1], method = "bagImpute")
 trainingTransformed <- predict(impute_NAs, training)
 testingTransformed <- predict(impute_NAs, testing)
 
-
-
-
 # FEATURE SELECTION
 
-# Does regsubsets consider interaction terms?
+# Can regsubsets consider interaction terms?
 regfit <- regsubsets(pct_comm ~ ., trainingTransformed[,-1], nvmax = 16)
 summary(regfit)
 par(mfrow = c(2,2))
@@ -217,20 +215,20 @@ Fit2 <- train(pct_comm ~ ownerNonprofit +
 
 
 #Test linear model Fit1
-testPred <- predict(Fit1, testingTransformed)
-postResample(testPred, testingTransformed$pct_comm)
+testFit1 <- predict(Fit1, testingTransformed)
+postResample(testFit1, testingTransformed$pct_comm)
 
-plot(testPred, testingTransformed$pct_comm)
+plot(testFit1, testingTransformed$pct_comm)
 
 results <- bind_cols(tbl_df(testPred), tbl_df(testing$pct_comm))
 names(results) <- c("predicted", "actual")
-ggplot(results, aes(x = actual, y = predicted)) + geom_point() + geom_abline()
+ggplot(results, aes(x = predicted, y = actual)) + geom_point() + geom_abline()
 
 #Test linear model Fit2
-testPred2 <- predict(Fit2, testingTransformed)
-postResample(testPred, testingTransformed$pct_comm)
+testFit2 <- predict(Fit2, testingTransformed)
+postResample(testFit2, testingTransformed$pct_comm)
 
-plot(testPred, testingTransformed$pct_comm)
+plot(testFit2, testingTransformed$pct_comm)
 
 #GBM Model attempt
 gbmGrid <-  expand.grid(interaction.depth = seq(1, 7, by = 2),
@@ -251,4 +249,5 @@ postResample(testGBM, testingTransformed$pct_comm)
 
 plot(testGBM, testingTransformed$pct_comm)
 plot(Fit_gbm$finalModel)
+
 
