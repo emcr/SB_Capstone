@@ -214,6 +214,21 @@ Fit2 <- train(pct_comm ~ ownerNonprofit +
               trControl = fitControl)
 
 
+
+
+#GBM Model attempt
+gbmGrid <-  expand.grid(interaction.depth = seq(1, 7, by = 2),
+                        n.trees = seq(100, 1000, by = 50),
+                        shrinkage = c(0.01, 0.1),
+                        n.minobsinnode = 5)
+
+set.seed(50) #Set seed again?
+Fit_gbm <- train(pct_comm ~ .,
+                 data = trainingTransformed,
+                 method = "gbm",
+                 trControl = fitControl, 
+                 verbose = FALSE,
+                 tuneGrid = gbmGrid)
 #Test linear model Fit1
 testFit1 <- predict(Fit1, testingTransformed)
 postResample(testFit1, testingTransformed$pct_comm)
@@ -230,20 +245,7 @@ postResample(testFit2, testingTransformed$pct_comm)
 
 plot(testFit2, testingTransformed$pct_comm)
 
-#GBM Model attempt
-gbmGrid <-  expand.grid(interaction.depth = seq(1, 7, by = 2),
-                        n.trees = seq(100, 1000, by = 50),
-                        shrinkage = c(0.01, 0.1),
-                        n.minobsinnode = 5)
-
-set.seed(50) #Set seed again?
-Fit_gbm <- train(pct_comm ~ .,
-                 data = trainingTransformed,
-                 method = "gbm",
-                 trControl = fitControl, 
-                 verbose = FALSE,
-                 tuneGrid = gbmGrid)
-
+#Test GBM model Fit_gbm
 testGBM <- predict(Fit_gbm, testingTransformed)
 postResample(testGBM, testingTransformed$pct_comm)
 
