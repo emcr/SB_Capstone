@@ -2,8 +2,7 @@
 title: "Predicting Emergency Room Payer Mix"
 author: "Emily Rinaldi"
 date: "September 7, 2016"
-output: html_document
-
+output: word_document
 ---
 
 
