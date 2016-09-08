@@ -22,13 +22,21 @@ census <- read_csv(census_file, skip = 2,
 
 census <- census %>% select(geo = X3, 
                             tot_pop = X4, 
-                            med_age = X42, 
+                            med_age = X42,
+                            pct_over18 = X47, 
                             pct_over65 = X53, 
                             pct_black = X161,
+                            pct_asian = X165,
                             pct_hisp = X231,
                             pct_nonhisp_wh = X249,
+                            pct_house_wchildren = X273,
+                            pct_extfamily_houses = X275,
+                            pct_nonrelative_houses =  X281,
+                            pct_group_qrts = X289,
                             pct_married_houses = X309,
-                            pct_sing_mother_houses = X319) %>%
+                            pct_sing_mother_houses = X319,
+                            avg_household_size = X336,
+                            pct_vacant_houses =  X345) %>%
   mutate(geo = tolower(geo))
   census <-  mutate(census, geo = sub(" county, california$", "", x = census$geo))
   census <-  mutate(census, geo = sub("^zcta5 ", "", x = census$geo))
@@ -75,14 +83,29 @@ econ_surv <- read_csv(econ_surv_file,
                       na = c("", NA, "(X)", "-", "N", "2,500-"))
 econ_surv <- econ_surv %>% select(geo = X3,
                                   pct_labor_force = X10,
+                                  pct_armed_forces = X26,
                                   pct_unemployed = X38,
-                                  median_household_income = X248,
-                                  mean_household_income = X252,
+                                  pct_female_labforce = X46,
+                                  pct_pub_trans = X86,
+                                  pct_service_ind = X114,
+                                  pct_sales_office = X118,
+                                  pct_construction = X122,
+                                  pct_transport_ind = X126,
+                                  pct_under10K = X210,
+                                  pct_10to15K = X214,
+                                  pct_15to25K = X218,
+                                  pct_25to35K = X222,
+                                  pct_35to50K = X226,
+                                  pct_50to75K = X230,
+                                  pct_75to100K = X234,
+                                  med_househ_income = X248,
+                                  mn_househ_income = X252,
+                                  pct_wSSI = X282,
+                                  pct_wcash_assist = X290,
                                   pct_SNAP = X298,
-                                  median_fam_income = X344,
-                                  mean_fam_income = X348,
                                   per_cap_income = X352,
-                                  median_worker_earnings = X368,
+                                  med_worker_earnings = X368,
+                                  med_male_earnings = X372,
                                   pct_private_ins = X390,
                                   pct_public_ins = X394,
                                   pct_no_ins = X398,
@@ -91,7 +114,7 @@ econ_surv <- econ_surv %>% select(geo = X3,
 
 econ_surv <-  mutate(econ_surv, geo = sub(" county, california$", "", x = econ_surv$geo))
 econ_surv <-  mutate(econ_surv, geo = sub("^zcta5 ", "", x = econ_surv$geo))
-econ_surv$median_worker_earnings <- as.numeric(econ_surv$median_worker_earnings)
+econ_surv$med_worker_earnings <- as.numeric(econ_surv$med_worker_earnings)
 
 #Join datasets
 all_data <- left_join(facilities, left_join(econ_surv, census), by = c("zip" = "geo"))
@@ -104,55 +127,103 @@ all_data$owner <- factor(all_data$owner)
 #Remove four facilities located in zip codes for which economic survey data is not available
 all_data <- filter(all_data, !is.na(pct_labor_force))
 
-#Plot all percent variables vs pct_comm faceted by facility ownership
-pct_table <- select(all_data, year:location, starts_with("pct_"))
-pct_table_long <- gather(pct_table, "stat", "value", pct_labor_force:pct_sing_mother_houses)
-ggplot(pct_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+#Plot all labor force and industry variables vs pct_comm
+labor_table <- select(all_data, year:location, pct_comm, pct_armed_forces, pct_construction, pct_labor_force, pct_sales_office, pct_service_ind, pct_transport_ind, pct_female_labforce, pct_over18, pct_over65, pct_unemployed)
+labor_table_long <- gather(labor_table, "stat", "value", pct_armed_forces:pct_unemployed)
+ggplot(labor_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+  geom_point(alpha = 0.3) + 
+  geom_smooth(se = FALSE, size = 2, method = lm) + 
+  xlab("value (as % of population)") + 
+  ylab("percent commercial patients") +
+  ggtitle("Labor Force and Industry Statistics")
+
+#Plot all benefits and insurance variables vs pct_comm
+ben_table <- select(all_data, year:location, pct_comm, pct_no_ins, pct_public_ins, pct_private_ins, pct_SNAP, pct_wcash_assist, pct_wSSI, pct_poverty)
+ben_table_long <- gather(ben_table, "stat", "value", pct_no_ins:pct_poverty)
+ggplot(ben_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
   geom_point(alpha = 0.3) + 
   geom_smooth(se = FALSE, size = 2, method = lm) + 
   xlab("value (as % of population)") + 
   ylab("percent commercial patients") + 
-  facet_grid(. ~ owner)
+  ggtitle("Insurance and Public Benefits Statistics")
 
-#Plot all income or earnings variables vs pct_comm faceted by facility ownership
+#Plot all race and household variables vs pct_comm
+race_table <- select(all_data, year:location, pct_comm, pct_asian, pct_black, pct_extfamily_houses, pct_group_qrts, pct_hisp, pct_house_wchildren, pct_married_houses, pct_nonhisp_wh, pct_nonrelative_houses, pct_pub_trans, pct_sing_mother_houses)
+race_table_long <- gather(race_table, "stat", "value", pct_asian:pct_sing_mother_houses)
+ggplot(race_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+  geom_point(alpha = 0.3) + 
+  geom_smooth(se = FALSE, size = 2, method = lm) + 
+  xlab("value (as % of population)") + 
+  ylab("percent commercial patients") + 
+  ggtitle("Race and Household Demographics")
+
+#Plot all median income or earnings variables vs pct_comm
 inc_table <- select(all_data, year:location, pct_comm, contains("income"), contains("earnings"))
-inc_table_long <- gather(inc_table, "stat", "value", median_household_income:median_worker_earnings)
+inc_table_long <- gather(inc_table, "stat", "value", med_househ_income:med_male_earnings)
 ggplot(inc_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
   geom_point(alpha = 0.3) + 
   geom_smooth(se = FALSE, size = 2, method = lm) + 
+  xlab("value") + ylab("percent commercial patients") +
+  ggtitle("Median Income Statistics")
+
+#Plot income distribution variables vs pct_comm
+inc_table2 <- select(all_data, year:location, pct_comm, ends_with("K", ignore.case = FALSE))
+inc_table2_long <- gather(inc_table2, "stat", "value", pct_under10K:pct_75to100K)
+ggplot(inc_table2_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+  geom_point(alpha = 0.3) + 
+  geom_smooth(se = FALSE, size = 2, method = lm) + 
   xlab("value") + ylab("percent commercial patients") + 
-  facet_grid(. ~ owner)
+  ggtitle("Income Distribution Statistics")
 
 # MODELING
 
 library(caret)
 library(leaps)
 
-#Prepare data for training
-
+#Prepare data for modeling
+#eliminate any unneeded columns that will not be used as predictors
 model_data <- all_data %>% 
   ungroup() %>% 
   select(pct_comm, 
          MSSA_desig, 
          owner, 
-         pct_labor_force:pct_sing_mother_houses)
+         pct_labor_force:pct_vacant_houses)
+
+##FEATURE SELECTION
+#narrow down variables using regsubsets from leaps package
+regfit <- regsubsets(pct_comm ~ ., model_data, nvmax = 16)
+reg_sum <- summary(regfit)
+
+#Use Mallow's Cp to choose the best regsubsets result, which is a model evaluation metric that is 
+#not as biased to adding more predictors as Rsquared
+plot(reg_sum$cp, xlab = "Number of Variables", ylab = "Cp")
+best_num <- which.min(reg_sum$cp)
+points(best_num, reg_sum$cp[best_num], pch = best_num, col = "red")
+coef(regfit, best_num)
+best_vars <- names(coef(regfit, best_num))
+
+#Filter model_data to include only those variables that appeared in the optimum regsubsets model
+model_filtered <- tbl_df(cbind(pct_comm = model_data$pct_comm, 
+                               owner = model_data$owner, 
+                               model_data[best_vars[4:14]]))
+
 
 #Create dummy variables for MSSA_design and owner categories -- why is intercept column created?
-model_data <- tbl_df(model.matrix( ~ ., model.frame(~., data = model_data, na.action = na.pass)))
+model_filtered2 <- tbl_df(model.matrix( ~ ., model.frame(~., data = model_filtered, na.action = na.pass)))
 
 #remove highly correlated variables, excluding dummy variables
-modelCor <- cor(model_data[, -(1:6)])
+modelCor <- cor(model_filtered2[, -(1:4)])
 summary(modelCor[upper.tri(modelCor)])
 
-highlyCorVar <- findCorrelation(modelCor, cutoff = 0.75) + 6
-model_data <- model_data[, -highlyCorVar]
+highlyCorVar <- findCorrelation(modelCor, cutoff = 0.75) + 4
+model_filtered3 <- model_filtered2[, -highlyCorVar]
 
 
 #Create training and testing data sets
 set.seed(50)
-inTraining <- createDataPartition(model_data$pct_comm, p = .7, list = FALSE)
-training <- model_data[inTraining,]
-testing <- model_data[-inTraining,]
+inTraining <- createDataPartition(model_filtered3$pct_comm, p = .7, list = FALSE)
+training <- model_filtered3[inTraining,]
+testing <- model_filtered3[-inTraining,]
 
 #Use bagged trees preprocessing method to impute NAs found in MSSA_desig and owner variables
 impute_NAs <- preProcess(training[,-1], method = "bagImpute")
@@ -160,96 +231,80 @@ impute_NAs <- preProcess(training[,-1], method = "bagImpute")
 trainingTransformed <- predict(impute_NAs, training)
 testingTransformed <- predict(impute_NAs, testing)
 
-# FEATURE SELECTION
-
-# Can regsubsets consider interaction terms?
-regfit <- regsubsets(pct_comm ~ ., trainingTransformed[,-1], nvmax = 16)
-summary(regfit)
-par(mfrow = c(2,2))
-plot(regfit, scale = "r2")
-plot(regfit, scale = "adjr2")
-plot(regfit, scale = "Cp")
-plot(regfit, scale = "bic")
-par(mfrow = c(1,1))
-
-reg_sum <- summary(regfit)
-plot(reg_sum$cp, xlab = "Number of Variables", ylab = "Cp")
-which.min(reg_sum$cp)
-points(4, reg_sum$cp[4], pch = 20, col = "red")
-
-coef(regfit, 4)
-
 #Set resampling method to repeated cross validation
 fitControl <- trainControl(method = "repeatedcv",
                            number = 10,
                            repeats = 5)
 
 #Train linear model
-## Selected variables using regsubsets. Tested all interactions but none were
-## significant. Also tested these methods: 
-## leapForward, leapBackward, lmStepAIC
+## Tested all interactions but none were significant
 
 set.seed(50) #Set seed again?
-Fit1 <- train(pct_comm ~ ownerNonprofit + 
-                ownerPublic + 
-                median_worker_earnings + 
-                pct_sing_mother_houses, 
+Fit1 <- train(pct_comm ~ ., 
               data = trainingTransformed,
               method = "lm",
               trControl = fitControl)
+summary(Fit1)
+Fit1$results
 
-## Adding pct_labor_force, top_pop, pct_married_houses increases R-squared,
-## but the p-values for added variables are all between .06 and .10
-
-set.seed(50) #Set seed again?
-Fit2 <- train(pct_comm ~ ownerNonprofit + 
-                ownerPublic + 
-                median_worker_earnings + 
-                pct_sing_mother_houses + 
-                pct_labor_force + 
-                tot_pop + 
-                pct_married_houses, 
-              data = trainingTransformed,
-              method = "lm",
-              trControl = fitControl)
-
-
-
-
-#GBM Model attempt
-gbmGrid <-  expand.grid(interaction.depth = seq(1, 7, by = 2),
-                        n.trees = seq(100, 1000, by = 50),
-                        shrinkage = c(0.01, 0.1),
-                        n.minobsinnode = 5)
-
-set.seed(50) #Set seed again?
-Fit_gbm <- train(pct_comm ~ .,
-                 data = trainingTransformed,
-                 method = "gbm",
-                 trControl = fitControl, 
-                 verbose = FALSE,
-                 tuneGrid = gbmGrid)
 #Test linear model Fit1
 testFit1 <- predict(Fit1, testingTransformed)
 postResample(testFit1, testingTransformed$pct_comm)
 
 plot(testFit1, testingTransformed$pct_comm)
 
-results <- bind_cols(tbl_df(testPred), tbl_df(testing$pct_comm))
-names(results) <- c("predicted", "actual")
-ggplot(results, aes(x = predicted, y = actual)) + geom_point() + geom_abline()
 
-#Test linear model Fit2
+#Remove insignificant variables and train a second model
+set.seed(50)
+Fit2 <- train(pct_comm ~ pct_75to100K + med_male_earnings + pct_public_ins + tot_pop + pct_asian + pct_vacant_houses, 
+              data = trainingTransformed,
+              method = "lm",
+              trControl = fitControl)
+summary(Fit2)
+Fit2$results
+
 testFit2 <- predict(Fit2, testingTransformed)
 postResample(testFit2, testingTransformed$pct_comm)
 
 plot(testFit2, testingTransformed$pct_comm)
 
-#Test GBM model Fit_gbm
-testGBM <- predict(Fit_gbm, testingTransformed)
-postResample(testGBM, testingTransformed$pct_comm)
+#GBM Model attempt to automate interactions
+gbmGrid <-  expand.grid(interaction.depth = seq(1, 7, by = 2),
+                        n.trees = seq(100, 1000, by = 50),
+                        shrinkage = c(0.01, 0.1),
+                        n.minobsinnode = 5)
 
-plot(testGBM, testingTransformed$pct_comm)
-plot(Fit_gbm$finalModel)
+set.seed(50)
+FitGBM1 <- train(pct_comm ~ .,
+                 data = trainingTransformed,
+                 method = "gbm",
+                 trControl = fitControl, 
+                 verbose = FALSE,
+                 tuneGrid = gbmGrid)
 
+#Test FitGBM1 model
+testGBM1 <- predict(FitGBM1, testingTransformed)
+postResample(testGBM1, testingTransformed$pct_comm)
+
+plot(testGBM1, testingTransformed$pct_comm)
+ggplot(FitGBM1)
+
+
+#Try GBM Model again with the most important variables from FitGBM1
+varImp(FitGBM1)
+
+set.seed(50)
+FitGBM2 <- train(pct_comm ~ med_male_earnings + pct_public_ins + pct_black + pct_service_ind + pct_hisp,
+                 data = trainingTransformed,
+                 method = "gbm",
+                 trControl = fitControl, 
+                 verbose = FALSE,
+                 tuneGrid = gbmGrid)
+
+#Test FitGBM3
+testGBM2 <- predict(FitGBM2, testingTransformed)
+postResample(testGBM2, testingTransformed$pct_comm)
+
+plot(testGBM2, testingTransformed$pct_comm)
+ggplot(FitGBM2)
 

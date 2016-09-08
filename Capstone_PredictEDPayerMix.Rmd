@@ -1,0 +1,457 @@
+---
+title: "Predicting Emergency Room Payer Mix"
+author: "Emily Rinaldi"
+date: "September 7, 2016"
+output: html_document
+
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#If code is running in author's working directory, set R package location 
+if(getwd() == "C:/Users/emily_rinaldi/Desktop/R Projects/SB Capstone"){
+  .libPaths("C:/Users/emily_rinaldi/Desktop/R/win-library/3.3")
+}
+
+#Load all required packages
+library(readr)
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+#Define data sources
+census_file <- "2010_Census_Demographics_CA.csv"
+econ_surv_file <- "ACS_2014_Economic_Estimates_CA.csv"
+facilities_file <- "CA_ED_Encounters_by_Expected_Payer.csv"
+
+#Read in census demographic data into dataframe
+census <- read_csv(census_file, skip = 2, 
+                   col_names = FALSE, 
+                   na = c("", NA, "(X)"))
+
+census <- census %>% select(geo = X3, 
+                            tot_pop = X4, 
+                            med_age = X42,
+                            pct_over18 = X47, 
+                            pct_over65 = X53, 
+                            pct_black = X161,
+                            pct_asian = X165,
+                            pct_hisp = X231,
+                            pct_nonhisp_wh = X249,
+                            pct_house_wchildren = X273,
+                            pct_extfamily_houses = X275,
+                            pct_nonrelative_houses =  X281,
+                            pct_group_qrts = X289,
+                            pct_married_houses = X309,
+                            pct_sing_mother_houses = X319,
+                            avg_household_size = X336,
+                            pct_vacant_houses =  X345) %>%
+  mutate(geo = tolower(geo))
+  census <-  mutate(census, geo = sub(" county, california$", "", x = census$geo))
+  census <-  mutate(census, geo = sub("^zcta5 ", "", x = census$geo))
+
+
+#Read in expected payer data into dataframe
+facilities_columns <- c("year", 
+                        "id", 
+                        "facility", 
+                        "MSSA_desig", 
+                        "MSSA_name", 
+                        "county", 
+                        "address", 
+                        "city", 
+                        "zip", 
+                        "ownership", 
+                        "EMS_level", 
+                        "trauma_desig", 
+                        "payor", 
+                        "volume", 
+                        "location")
+
+facilities <- read_csv(facilities_file, 
+                       col_names = facilities_columns, 
+                       col_types = cols(zip = col_character()), 
+                       skip = 1)
+
+#Filter records to year with latest data available and transform into "tidy" format
+facilities <- facilities %>% 
+  group_by(facility) %>% 
+  dplyr::mutate(max_year = max(year)) %>% 
+  filter(year == max_year) %>% 
+  spread(payor, volume) %>%
+  mutate(tot_volume = `Medi-Cal` + Medicare + Other + `Private Coverage` + `Self Pay`, 
+         pct_comm = `Private Coverage`/tot_volume) %>%
+  #Remove four facilities for which not enough data is available to calculate 
+  #percent of patients with commercial insurance
+  filter(!is.na(pct_comm))
+
+#Read in ACS economic survey data
+econ_surv <- read_csv(econ_surv_file, 
+                      skip = 2, 
+                      col_names = FALSE, 
+                      na = c("", NA, "(X)", "-", "N", "2,500-"))
+econ_surv <- econ_surv %>% select(geo = X3,
+                                  pct_labor_force = X10,
+                                  pct_armed_forces = X26,
+                                  pct_unemployed = X38,
+                                  pct_female_labforce = X46,
+                                  pct_pub_trans = X86,
+                                  pct_service_ind = X114,
+                                  pct_sales_office = X118,
+                                  pct_construction = X122,
+                                  pct_transport_ind = X126,
+                                  pct_under10K = X210,
+                                  pct_10to15K = X214,
+                                  pct_15to25K = X218,
+                                  pct_25to35K = X222,
+                                  pct_35to50K = X226,
+                                  pct_50to75K = X230,
+                                  pct_75to100K = X234,
+                                  med_househ_income = X248,
+                                  mn_househ_income = X252,
+                                  pct_wSSI = X282,
+                                  pct_wcash_assist = X290,
+                                  pct_SNAP = X298,
+                                  per_cap_income = X352,
+                                  med_worker_earnings = X368,
+                                  med_male_earnings = X372,
+                                  pct_private_ins = X390,
+                                  pct_public_ins = X394,
+                                  pct_no_ins = X398,
+                                  pct_poverty = X514) %>%
+  mutate(geo = tolower(geo))
+
+econ_surv <-  mutate(econ_surv, geo = sub(" county, california$", "", x = econ_surv$geo))
+econ_surv <-  mutate(econ_surv, geo = sub("^zcta5 ", "", x = econ_surv$geo))
+econ_surv$med_worker_earnings <- as.numeric(econ_surv$med_worker_earnings)
+
+#Join datasets
+all_data <- left_join(facilities, left_join(econ_surv, census), by = c("zip" = "geo"))
+all_data <- separate(all_data, ownership, c("owner", "owner_type"), sep = " - ")
+
+#Change class of MSSA_desig and owner variables to factor
+all_data$MSSA_desig <- factor(all_data$MSSA_desig)
+all_data$owner <- factor(all_data$owner)
+
+#Remove four facilities located in zip codes for which economic survey data is not available
+all_data <- filter(all_data, !is.na(pct_labor_force))
+```
+
+## Introduction
+
+### The Problem
+Public information about the patient population that visits a hospital’s emergency room is generally very limited, so can demographic and economic factors for a particular geographic area predict the patient mix of emergency departments in that area?
+
+### The Client
+The client is an emergency department physician staffing provider, which contracts with hospitals to staff physicians and performs all coding, billing, and collection functions related to the physicians’ services. The client’s main source of revenue is fee-for-service collections, and the revenue for a particular patient encounter is dependent on the health care coverage of the patient who was treated. 
+
+Most payers can be grouped into the following classes, in order from most expected revenue to least: Commercial Insurance, Medicare, Medicaid, and Self Pay. In the United States, emergency departments are subject to the Emergency Medical Treatment and Labor Act (EMTALA), which is a federal law that requires emergency department providers to stabalize and treat any patient that arrives, regardless of their ability to pay. Because treating each patient is costly for the client, operating at facilities where there are enough patients with insurance to cover provider staffing costs is paramount. Being able to accurately estimate the payer mix for potential client facilities would enable the company to focus business development efforts on those facilities located in geographic areas that indicate the most favorable payer mixes.
+
+### Data Sources
+1. Emergency Department Data By Expected Payer Source 2010-2014: This dataset contains the distribution of emergency department encounters and admits by expected payer for California hospitals years 2010-2014.
+
+2. 2010-2014 American Community Survey: The ACS collects information such as age, race, income, commute time to work, home value, veteran status, and other important data, and it is available by geographic area.
+
+3. 2010 Census Demographic Profile: The Demographic Profile contains data on population characteristics including sex, age, race, Hispanic or Latino, household relationship, household type, group quarters population; and housing characteristics including occupancy and tenure.
+
+### Example Data
+After cleaning the data and joining it into a single dataset, we have a dataframe of 66 variables with 346 observations. Each observation represents an emergency facility and the demographic and economic characteristics of the zip code in which it is located. A glimpse of the data is provided below.
+```{r glimpse data}
+glimpse(all_data)
+```
+
+
+## Data Exploration
+The dataset contains many potentially predictive variables, so we plotted the relationship between each variable and our dependent variable. The following graphs split the variables into related categories to observe correlation with percent of commercial patients as well as collinearity with other similar variables.
+
+We see that the scatterplot data is very noisy, but in most cases, the best fit lines confirm our intuition about the variables' relationships to the percent of commercial patients. 
+
+The graph below shows that a higher labor force participation rate, indicates more commercial patients at emergency departments located in the same zip code. Interestingly, this also shows that the proportion of people over age 65 has a positive relationship with the percent of commercial patients, even though people over age 65 are eligible for Medicare coverage. Also, of the industries considered, only the sales and office jobs have a positive correlation with commercial patients.
+
+```{r graph 1, echo = FALSE}
+
+#Plot all labor force and industry variables vs pct_comm
+labor_table <- select(all_data, year:location, pct_comm, pct_armed_forces, pct_construction, pct_labor_force, pct_sales_office, pct_service_ind, pct_transport_ind, pct_female_labforce, pct_over18, pct_over65, pct_unemployed)
+labor_table_long <- gather(labor_table, "stat", "value", pct_armed_forces:pct_unemployed)
+ggplot(labor_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+  geom_point(alpha = 0.3) + 
+  geom_smooth(se = FALSE, size = 2, method = lm) + 
+  xlab("value (as % of population)") + 
+  ylab("percent commercial patients") +
+  ggtitle("Labor Force and Industry Statistics")
+```
+
+The following graph shows that more people on public assistance indicates fewer commercial patients at facilities in the same area. Also, the only line with a positive slope shows the percent of the population with private insurance. This may serve as confirmation that the Census and ACS data is truly representative of emergency department patients in the same zip code.
+
+```{r graph 2, echo = FALSE}
+#Plot all benefits and insurance variables vs pct_comm
+ben_table <- select(all_data, year:location, pct_comm, pct_no_ins, pct_public_ins, pct_private_ins, pct_SNAP, pct_wcash_assist, pct_wSSI, pct_poverty)
+ben_table_long <- gather(ben_table, "stat", "value", pct_no_ins:pct_poverty)
+ggplot(ben_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+  geom_point(alpha = 0.3) + 
+  geom_smooth(se = FALSE, size = 2, method = lm) + 
+  xlab("value (as % of population)") + 
+  ylab("percent commercial patients") + 
+  ggtitle("Insurance and Public Benefits Statistics")
+```
+
+The Race and Household Demographics graph below shows that populations with more Asians, and to a lesser extent more whites, may have more commercially insured individuals. Also, it appears that the proportion of family households headed by a single mother may have a strong inverse relationship with commercial insurance patients.
+
+```{r graph 3, echo= FALSE}
+#Plot all race and household variables vs pct_comm
+race_table <- select(all_data, year:location, pct_comm, pct_asian, pct_black, pct_extfamily_houses, pct_group_qrts, pct_hisp, pct_house_wchildren, pct_married_houses, pct_nonhisp_wh, pct_nonrelative_houses, pct_pub_trans, pct_sing_mother_houses)
+race_table_long <- gather(race_table, "stat", "value", pct_asian:pct_sing_mother_houses)
+ggplot(race_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+  geom_point(alpha = 0.3) + 
+  geom_smooth(se = FALSE, size = 2, method = lm) + 
+  xlab("value (as % of population)") + 
+  ylab("percent commercial patients") + 
+  ggtitle("Race and Household Demographics")
+```
+
+When observing the income distrubtions of a population, a positive correlation to commercially insured patients is not reached until household incomes exceed $75,000. 
+
+```{r graph 4, echo=FALSE}
+#Plot income distribution variables vs pct_comm
+inc_table2 <- select(all_data, year:location, pct_comm, ends_with("K", ignore.case = FALSE))
+inc_table2_long <- gather(inc_table2, "stat", "value", pct_under10K:pct_75to100K)
+ggplot(inc_table2_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+  geom_point(alpha = 0.3) + 
+  geom_smooth(se = FALSE, size = 2, method = lm) + 
+  xlab("value (as % of population") + ylab("percent commercial patients") + 
+  ggtitle("Income Distribution Statistics")
+```
+
+As expected, higher median incomes for an area indicate more ER patients with commercial insurance.
+
+```{r graph 5, echo= FALSE}
+#Plot all median income or earnings variables vs pct_comm
+inc_table <- select(all_data, year:location, pct_comm, contains("income"), contains("earnings"))
+inc_table_long <- gather(inc_table, "stat", "value", med_househ_income:med_male_earnings)
+ggplot(inc_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+  geom_point(alpha = 0.3) + 
+  geom_smooth(se = FALSE, size = 2, method = lm) + 
+  xlab("value") + ylab("percent commercial patients") +
+  ggtitle("Median Income Statistics")
+
+
+```
+
+
+## Feature Selection and Preprocessing
+
+### regsubsets Function
+To narrow down the dataset before modeling, we used the regsubsets function from the leaps package. This function performs an exhaustive search algorithm to find the best models of all sizes up to the specified nvmax, which we set at 16 variables. The results indicate which variables should be included in each model. 
+
+```{r regsubsets prep, include = FALSE}
+library(caret)
+library(leaps)
+
+#Prepare data for modeling
+#eliminate any unneeded columns that will not be used as predictors
+model_data <- all_data %>% 
+  ungroup() %>% 
+  select(pct_comm, 
+         MSSA_desig, 
+         owner, 
+         pct_labor_force:pct_vacant_houses)
+```
+```{r regsubsets}
+regfit <- regsubsets(pct_comm ~ ., model_data, nvmax = 16)
+reg_sum <- summary(regfit)
+```
+
+We selected the model size based on which model minimizes Mallow's Cp, a metric that is less biased toward overfitting by adding more variables, and then filtered the dataset to only those variables which are included in the best model and added dummy variables for the factor values of owner, which was one of the predictors chosen by regsubsets. 
+
+```{r regfit output, echo = FALSE}
+plot(reg_sum$cp, xlab = "Number of Variables", ylab = "Cp", main = "Results of Regsubsets Model Selection")
+best_num <- which.min(reg_sum$cp)
+points(best_num, reg_sum$cp[best_num], pch = best_num, col = "red")
+```
+
+The model with that minimizes Mallow's Cp has `r best_num` variables, and the dataset was filtered to include only these variables:
+```{r filter variables, echo = FALSE}
+names(coef(regfit, best_num))
+
+best_vars <- names(coef(regfit, best_num))
+
+#Filter model_data to include only those variables that appeared in the optimum regsubsets model
+model_filtered <- tbl_df(cbind(pct_comm = model_data$pct_comm, 
+                               owner = model_data$owner, 
+                               model_data[best_vars[4:14]]))
+
+#Create dummy variables for owner variable
+model_filtered2 <- tbl_df(model.matrix( ~ ., model.frame(~., data = model_filtered, na.action = na.pass)))
+```
+
+### Remove highly correlated variables
+We used the caret package to identify and remove any highly correlated variables that still remain in our dataset, with a cutoff point of 0.75.
+```{r cor}
+#remove highly correlated variables, excluding dummy variables
+modelCor <- cor(model_filtered2[, -(1:4)])
+summary(modelCor[upper.tri(modelCor)])
+
+highlyCorVar <- findCorrelation(modelCor, cutoff = 0.75) + 4
+model_filtered3 <- model_filtered2[, -highlyCorVar]
+```
+
+### Create training and testing datasets
+We used the caret package's createDataPartition function to perform a .7/.3 split of our dataset, which is stratified based on the value of our dependent variable, pct_comm.
+```{r sampling}
+#Create training and testing data sets
+set.seed(50)
+inTraining <- createDataPartition(model_filtered3$pct_comm, p = .7, list = FALSE)
+training <- model_filtered3[inTraining,]
+testing <- model_filtered3[-inTraining,]
+
+```
+
+### Imputation of NAs
+Because our dataset is relatively small, we did not want to exclude any observations just because one predictor's value was missing. The owner variable contained 10 missing values which we filled using the bagged trees imputation method.
+
+```{r imputation}
+impute_NAs <- preProcess(training[,-1], method = "bagImpute")
+
+set.seed(50)
+trainingTransformed <- predict(impute_NAs, training)
+testingTransformed <- predict(impute_NAs, testing)
+```
+
+## Model Training and Analysis
+
+### 1. Linear Regression (lm)
+```{r model setup, include = FALSE}
+#Set resampling method to repeated cross validation
+fitControl <- trainControl(method = "repeatedcv",
+                           number = 10,
+                           repeats = 5)
+
+#Train linear model
+## Tested all interactions but none were significant
+
+set.seed(50)
+Fit1 <- train(pct_comm ~ ., 
+              data = trainingTransformed,
+              method = "lm",
+              trControl = fitControl)
+```
+
+Performing a linear regression of all remaining variables against pct_comm  on the training set yields the following results:
+
+```{r Fit1 summary, echo = FALSE}
+summary(Fit1)
+Fit1$results
+```
+
+Below are the results of testing the model on the test dataset:
+
+```{r Fit1 test, echo = FALSE}
+testFit1 <- predict(Fit1, testingTransformed)
+postResample(testFit1, testingTransformed$pct_comm)
+
+```
+
+The test result's Rsquared is similar to the model Rsquared, but there may be room for improvement. Removing all insignificant variables from Fit1 and training a new model yields the following results:
+
+```{r, echo = FALSE}
+set.seed(50)
+Fit2 <- train(pct_comm ~ ownerPublic + pct_service_ind + pct_75to100K + med_male_earnings + pct_asian, 
+              data = trainingTransformed,
+              method = "lm",
+              trControl = fitControl)
+summary(Fit2)
+Fit2$results
+
+testFit2 <- predict(Fit2, testingTransformed)
+postResample(testFit2, testingTransformed$pct_comm)
+
+
+```
+
+Interestingly, removing insignificant variables decreased both the Multiple R-squared and the Adjusted R-squared. It also resulted in a lower Rsquared when predicting the test set.
+
+### 2. Stochastic Gradient Boosting (gbm)
+
+In attempt to improve upon the linear regression models explained above, we tested training the model with interactions of every combination of two terms. None of these interactions were significant. To automate the testing of higher degree interactions, we used the caret package to train a stochastic gradient boosting model, with method set to "gbm". 
+
+The GBM model finds the model that maximizes Rsquared value across various tuning parameters. The results of the best tune and its prediction on the testing set are as follows:
+
+```{r gbm1, include = FALSE}
+#GBM Model attempt to automate interactions
+gbmGrid <-  expand.grid(interaction.depth = seq(1, 7, by = 2),
+                        n.trees = seq(100, 1000, by = 50),
+                        shrinkage = c(0.01, 0.1),
+                        n.minobsinnode = 5)
+
+set.seed(50)
+FitGBM1 <- train(pct_comm ~ .,
+                 data = trainingTransformed,
+                 method = "gbm",
+                 trControl = fitControl, 
+                 verbose = FALSE,
+                 tuneGrid = gbmGrid)
+```
+
+```{r test GBM1, echo = FALSE}
+FitGBM1$results[row.names(FitGBM1$bestTune),]
+
+#Test FitGBM1 model
+print("Test Set Prediction Results:")
+testGBM1 <- predict(FitGBM1, testingTransformed)
+postResample(testGBM1, testingTransformed$pct_comm)
+
+```
+
+The best tune has a model Rsquared of `r FitGBM1$results[row.names(FitGBM1$bestTune), "Rsquared"]` but a much lower Rsquared of `r postResample(testGBM1, testingTransformed$pct_comm)["Rsquared"]` when predicting the test set. This is likely a result of overfitting the GBM model to the training set.
+
+According to caret function varImp, the most important variables in the FitGBM1 model are as follows:
+
+```{r varimp}
+varImp(FitGBM1)
+```
+
+Fitting a GBM model with only the top 5 variables above produces the following results:
+
+```{r FitGBM2, echo = FALSE}
+set.seed(50)
+FitGBM2 <- train(pct_comm ~ med_male_earnings + pct_public_ins + pct_black + pct_service_ind + pct_hisp,
+                 data = trainingTransformed,
+                 method = "gbm",
+                 trControl = fitControl, 
+                 verbose = FALSE,
+                 tuneGrid = gbmGrid)
+
+FitGBM2$bestTune
+
+#Test FitGBM2
+print("Test Set Prediction Results:")
+testGBM2 <- predict(FitGBM2, testingTransformed)
+postResample(testGBM2, testingTransformed$pct_comm)
+```
+
+The Rsquared of the best tune increased in this model, as did the Rsquared from testing the model, but the testing Rsquared is still much lower than that obtained using the linear regression model.
+
+### Analysis of results
+
+Our best result in predicting the percent of emergency department patients with commercial insurance was achieved with the first linear model we tested. This model included all of the variables remaining after filtering our dataset for the predictors indicated by the regsubsets algorithm and then removing highly correlated predictors.
+
+The following scatterplot shows the predicted and actual values of the dependent variable for each test set observation. 
+
+```{r plot results, echo = FALSE}
+plot(testFit1, testingTransformed$pct_comm, main = "Results of Linear Regression Model", xlab = "Predicted pct_comm", ylab = "Actual pct_comm")
+```
+
+While the model only explains a fraction of the variance in the proportion of commercial patients at California emergency rooms, it can provide the client with a starting point of where to focus its business development and sales efforts.
+
+## Conclusion
+
+In conclusion, we would recommend that the client take the following action as a result of this analysis:
+
+1. Due to the limited scope of this publicly available dataset, which includes only emergency facilities in California, the client should test the model on its own facilities to see if the results are similar.
+
+2. The client should consider whether the results pertain to all states or only those which also expanded Medicaid coverage, as California did in 2014. The client could run a similar analysis using Medicaid expansion as an additional predictor.
+
+3. Further study should be done to determine whether the population residing in a facility's zip code is the best representation of its client base. A potential analysis could be done to match each zip code to its nearest emergency room to better capture the entire population which may present at the facility. This could improve results, given that many zip codes represent a relatively small geographic area, which may or may not include an emergency facility.
