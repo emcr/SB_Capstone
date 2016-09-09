@@ -218,7 +218,6 @@ summary(modelCor[upper.tri(modelCor)])
 highlyCorVar <- findCorrelation(modelCor, cutoff = 0.75) + 4
 model_filtered3 <- model_filtered2[, -highlyCorVar]
 
-
 #Create training and testing data sets
 set.seed(50)
 inTraining <- createDataPartition(model_filtered3$pct_comm, p = .7, list = FALSE)
@@ -254,7 +253,6 @@ postResample(testFit1, testingTransformed$pct_comm)
 
 plot(testFit1, testingTransformed$pct_comm)
 
-
 #Remove insignificant variables and train a second model
 set.seed(50)
 Fit2 <- train(pct_comm ~ ownerPublic + pct_service_ind + pct_75to100K + med_male_earnings + pct_asian, 
@@ -286,9 +284,6 @@ FitGBM1 <- train(pct_comm ~ .,
 testGBM1 <- predict(FitGBM1, testingTransformed)
 postResample(testGBM1, testingTransformed$pct_comm)
 
-plot(testGBM1, testingTransformed$pct_comm)
-
-
 #Try GBM Model again with the most important variables from FitGBM1
 varImp(FitGBM1)
 
@@ -303,6 +298,3 @@ FitGBM2 <- train(pct_comm ~ med_male_earnings + pct_public_ins + pct_black + pct
 #Test FitGBM3
 testGBM2 <- predict(FitGBM2, testingTransformed)
 postResample(testGBM2, testingTransformed$pct_comm)
-
-plot(testGBM2, testingTransformed$pct_comm)
-
