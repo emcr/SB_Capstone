@@ -320,7 +320,6 @@ testingTransformed <- predict(impute_NAs, testing)
 ```
 
 ## Model Training and Analysis
-We used the caret package to train two linear regression models and two stochastic gradient boosting models to our training set. For each model, we selected 10-fold cross validation for resampling. The results of our model training and analysis are below.
 
 ### 1. Linear Regression (lm)
 ```{r model setup, include = FALSE}
@@ -330,6 +329,8 @@ fitControl <- trainControl(method = "repeatedcv",
                            repeats = 5)
 
 #Train linear model
+## Tested all interactions but none were significant
+
 set.seed(50)
 Fit1 <- train(pct_comm ~ ., 
               data = trainingTransformed,
@@ -337,7 +338,7 @@ Fit1 <- train(pct_comm ~ .,
               trControl = fitControl)
 ```
 
-Performing a linear regression of all remaining variables against pct_comm on the training set yields the following results:
+Performing a linear regression of all remaining variables against pct_comm  on the training set yields the following results:
 
 ```{r Fit1 summary, echo = FALSE}
 summary(Fit1)
@@ -393,14 +394,17 @@ FitGBM1 <- train(pct_comm ~ .,
                  tuneGrid = gbmGrid)
 ```
 
-```{r result GBM1, echo = FALSE}
+```{r best GBM1, echo = FALSE}
 FitGBM1$results[row.names(FitGBM1$bestTune),]
 ```
 
 Test set prediction results:
-```{r test GBM1, echo = FALSE}
+```{r GBM1 test, echo = FALSE}
+#Test FitGBM1 model
+print("Test Set Prediction Results:")
 testGBM1 <- predict(FitGBM1, testingTransformed)
 postResample(testGBM1, testingTransformed$pct_comm)
+
 ```
 
 The best tune has a model Rsquared of `r FitGBM1$results[row.names(FitGBM1$bestTune), "Rsquared"]` but a much lower Rsquared of `r postResample(testGBM1, testingTransformed$pct_comm)["Rsquared"]` when predicting the test set. This is likely a result of overfitting the GBM model to the training set.
@@ -422,11 +426,12 @@ FitGBM2 <- train(pct_comm ~ med_male_earnings + pct_public_ins + pct_black + pct
                  verbose = FALSE,
                  tuneGrid = gbmGrid)
 
-FitGBM2$bestTune
+FitGBM2$results[row.names(FitGBM2$bestTune),]
 ```
 
 Test set prediction results:
-```{r test GBM2, echo = FALSE}
+```{r FitGBM2 test, echo = FALSE}
+#Test FitGBM2
 testGBM2 <- predict(FitGBM2, testingTransformed)
 postResample(testGBM2, testingTransformed$pct_comm)
 ```

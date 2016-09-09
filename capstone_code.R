@@ -228,6 +228,7 @@ testing <- model_filtered3[-inTraining,]
 #Use bagged trees preprocessing method to impute NAs found in MSSA_desig and owner variables
 impute_NAs <- preProcess(training[,-1], method = "bagImpute")
 
+set.seed(50)
 trainingTransformed <- predict(impute_NAs, training)
 testingTransformed <- predict(impute_NAs, testing)
 
@@ -239,7 +240,7 @@ fitControl <- trainControl(method = "repeatedcv",
 #Train linear model
 ## Tested all interactions but none were significant
 
-set.seed(50) #Set seed again?
+set.seed(50)
 Fit1 <- train(pct_comm ~ ., 
               data = trainingTransformed,
               method = "lm",
@@ -256,7 +257,7 @@ plot(testFit1, testingTransformed$pct_comm)
 
 #Remove insignificant variables and train a second model
 set.seed(50)
-Fit2 <- train(pct_comm ~ pct_75to100K + med_male_earnings + pct_public_ins + tot_pop + pct_asian + pct_vacant_houses, 
+Fit2 <- train(pct_comm ~ ownerPublic + pct_service_ind + pct_75to100K + med_male_earnings + pct_asian, 
               data = trainingTransformed,
               method = "lm",
               trControl = fitControl)
@@ -266,7 +267,6 @@ Fit2$results
 testFit2 <- predict(Fit2, testingTransformed)
 postResample(testFit2, testingTransformed$pct_comm)
 
-plot(testFit2, testingTransformed$pct_comm)
 
 #GBM Model attempt to automate interactions
 gbmGrid <-  expand.grid(interaction.depth = seq(1, 7, by = 2),
@@ -287,7 +287,6 @@ testGBM1 <- predict(FitGBM1, testingTransformed)
 postResample(testGBM1, testingTransformed$pct_comm)
 
 plot(testGBM1, testingTransformed$pct_comm)
-ggplot(FitGBM1)
 
 
 #Try GBM Model again with the most important variables from FitGBM1
@@ -306,5 +305,4 @@ testGBM2 <- predict(FitGBM2, testingTransformed)
 postResample(testGBM2, testingTransformed$pct_comm)
 
 plot(testGBM2, testingTransformed$pct_comm)
-ggplot(FitGBM2)
 
