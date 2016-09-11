@@ -154,7 +154,7 @@ Most payers can be grouped into the following classes, in order from most expect
 
 2. 2010-2014 American Community Survey: The ACS collects information such as age, race, income, commute time to work, home value, veteran status, and other important data, and it is available by geographic area.
 
-3. 2010 Census Demographic Profile: The Demographic Profile contains data on population characteristics including sex, age, race, Hispanic or Latino, household relationship, household type, group quarters population; and housing characteristics including occupancy and tenure.
+3. 2010 Census Demographic Profile: The Demographic Profile contains data on population characteristics including sex, age, race, household relationship, household type, group quarters population; and housing characteristics including occupancy and tenure.
 
 ### Example Data
 After cleaning the data and joining it into a single dataset, we have a dataframe of 66 variables with 346 observations. Each observation represents an emergency facility and the demographic and economic characteristics of the zip code in which it is located. A glimpse of the data is provided below.
@@ -168,7 +168,7 @@ The dataset contains many potentially predictive variables, so we plotted the re
 
 We see that the scatterplot data is very noisy, but in most cases, the best fit lines confirm our intuition about the variables' relationships to the percent of commercial patients. 
 
-The graph below shows that a higher labor force participation rate, indicates more commercial patients at emergency departments located in the same zip code. Interestingly, this also shows that the proportion of people over age 65 has a positive relationship with the percent of commercial patients, even though people over age 65 are eligible for Medicare coverage. Also, of the industries considered, only the sales and office jobs have a positive correlation with commercial patients.
+The graph below shows that a higher labor force participation rate indicates more commercial patients at emergency departments located in the same zip code. Interestingly, this also shows that the proportion of people over age 65 has a positive relationship with the percent of commercial patients, even though people over age 65 are eligible for Medicare coverage. Also, of the industries considered, only the sales and office jobs have a positive correlation with commercial patients.
 
 ```{r graph 1, echo = FALSE}
 
@@ -263,7 +263,7 @@ regfit <- regsubsets(pct_comm ~ ., model_data, nvmax = 16)
 reg_sum <- summary(regfit)
 ```
 
-We selected the model size based on which model minimizes Mallow's Cp, a metric that is less biased toward overfitting by adding more variables, and then filtered the dataset to only those variables which are included in the best model and added dummy variables for the factor values of owner, which was one of the predictors chosen by regsubsets. 
+We selected the model size based on which model minimizes Mallow's Cp, a metric that is less biased toward overfitting by adding more variables, and then filtered the dataset to only those variables which are included in the best model. We then added dummy variables for the factor values of owner, which was one of the predictors chosen by regsubsets. 
 
 ```{r regfit output, echo = FALSE}
 plot(reg_sum$cp, xlab = "Number of Variables", ylab = "Cp", main = "Results of Regsubsets Model Selection")
@@ -271,7 +271,7 @@ best_num <- which.min(reg_sum$cp)
 points(best_num, reg_sum$cp[best_num], pch = best_num, col = "red")
 ```
 
-The model with that minimizes Mallow's Cp has `r best_num` variables, and the dataset was filtered to include only these variables:
+The model that minimizes Mallow's Cp has `r best_num` variables, and the dataset was filtered to include only these variables:
 ```{r filter variables, echo = FALSE}
 names(coef(regfit, best_num))
 
@@ -431,7 +431,7 @@ testGBM2 <- predict(FitGBM2, testingTransformed)
 postResample(testGBM2, testingTransformed$pct_comm)
 ```
 
-The Rsquared of the best tune increased in this model, as did the Rsquared from testing the model, but the testing Rsquared is still much lower than that obtained using the linear regression model.
+The Rsquared of the best tune increased in this model, as did the Rsquared from predicting the test set, but the testing Rsquared is still much lower than that obtained using the initial linear regression model.
 
 ### Analysis of results
 
