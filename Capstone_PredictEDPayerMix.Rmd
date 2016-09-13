@@ -205,8 +205,8 @@ ggplot(labor_table_long, aes(x = Value, y = `% Commercial Patients`, col = `Stat
   theme(legend.key.size = unit(.8, "cm"))
 
 names(labor_table) <- sub("\n", "", names(labor_table))
-writeLines("Correlation with % Commercial Patients:")
-cor(labor_table[,-1], labor_table[,1])
+
+knitr::kable(cor(labor_table[,-1], labor_table[,1]), caption = "Correlation with % Commercial Patients:")
 ```
 
 The following graph shows that more people on public assistance indicates fewer commercial patients at facilities in the same area. People who are eligible for public assistance may not be employed or may have low incomes to be eligible for Medicaid, in which case they would not need commercial health insurance. Also, the only line with a positive slope shows the percent of the population with private insurance. This may serve as confirmation that the Census and ACS data is truly representative of emergency department patients in the same zip code, which is the entire basis of our analysis.
@@ -232,8 +232,8 @@ ggplot(ben_table_long, aes(x = Value, y = `% Commercial Patients`, col = `Statis
   theme(legend.key.size = unit(1, "cm"))
 
 names(ben_table) <- sub("\n", "", names(ben_table))
-writeLines("Correlation with % Commercial Patients:")
-cor(ben_table[,-1], ben_table[,1])
+
+knitr::kable(cor(ben_table[,-1], ben_table[,1]), caption = "Correlation with % Commercial Patients:")
 ```
 
 The Race and Household Demographics graph below shows that populations with more Asians, and to a lesser extent more whites, may have more commercially insured individuals. Also, it appears that the proportion of family households headed by a single mother may have a strong inverse relationship with commercial insurance patients. This may be because single mother households with children are more likely to be eligible for Medicaid coverage.
@@ -263,8 +263,8 @@ ggplot(race_table_long, aes(x = Value, y = `% Commercial Patients`, col = `Stati
   theme(legend.key.size = unit(.8, "cm"))
 
 names(race_table) <- sub("\n", "", names(race_table))
-writeLines("Correlation with % Commercial Patients:")
-cor(race_table[,-1], race_table[,1])
+
+knitr::kable(cor(race_table[,-1], race_table[,1]), caption = "Correlation with % Commercial Patients:")
 ```
 
 When observing the income distrubtions of a population, a positive correlation to commercially insured patients is not reached until household incomes exceed $75,000. 
@@ -289,8 +289,8 @@ ggplot(inc_table2_long, aes(x = Value, y = `% Commercial Patients`, col = `Stati
   theme(legend.key.size = unit(1, "cm"))
 
 names(inc_table2) <- sub("\n", "", names(inc_table2))
-writeLines("Correlation with % Commercial Patients:")
-cor(inc_table2[,-1], inc_table2[,1])
+
+knitr::kable(cor(inc_table2[,-1], inc_table2[,1]), caption = "Correlation with % Commercial Patients:")
 ```
 
 As expected, higher median incomes for an area indicate more ER patients with commercial insurance. Higher wages likely means more people that can afford the health benefits offered by their employers and fewer workers eligible for Medicaid.
@@ -314,8 +314,8 @@ ggplot(inc_table_long, aes(x = Value, y = `% Commercial Patients`, col = `Statis
   theme(legend.key.size = unit(1, "cm"))
 
 names(inc_table) <- sub("\n", "", names(inc_table))
-writeLines("Correlation with % Commercial Patients:")
-cor(inc_table[,-1], inc_table[,1])
+
+knitr::kable(cor(inc_table[,-1], inc_table[,1]), caption = "Correlation with % Commercial Patients:")
 ```
 
 
@@ -525,8 +525,7 @@ At the cross validated R^2^ of `r round(Fit1$results[1, "Rsquared"],3)`, the mod
 According to the model, facilities with the most commercial patients are likely privately owned or nonprofit facilities located in zip codes with high wages, more Asian/Asian-American residents, and a large service and hospitality industry. The following coefficient summary and variable importance chart show the impact each variable has on the final model:
 
 ```{r coef sum, fig.width = 7, echo=FALSE}
-writeLines("Linear Model Coefficient Summary:\n")
-summary(Fit1)$coefficients
+knitr::kable(summary(Fit1)$coefficients, caption = "Linear Model Coefficient Summary:")
 
 Fit1_varplot <- plot(varImp(Fit1), main = "Linear Model Variable Importance")
 Fit1_vars <- c("% Hispanic (pct_hisp)", "% in Sales or Office Jobs (pct_sales_office)", "% Black (pct_black)", "% with Public Health Insurance (pct_public_ins)", "% Vacant Houses (pct_vacant_houses)", "Nonprofit Facility Owner (ownerNonprofit)", "Total Population (tot_pop)", "% Asian (pct_asian)", "Public or Community Facility (ownerPublic)", "% in Service/Hospitality Industry (pct_service_ind)", "% Earning $75-100K (pct_75to100K)", "Median Male Worker Earnings (med_male_earnings)")
