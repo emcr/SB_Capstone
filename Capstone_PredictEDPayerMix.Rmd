@@ -1,13 +1,14 @@
 ---
 title: "Predicting Emergency Room Payer Mix"
 author: "Emily Rinaldi"
-date: "September 7, 2016"
+date: "September 13, 2016"
 output: word_document
+
 ---
 
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 
 #If code is running in author's working directory, set R package location 
 if(getwd() == "C:/Users/emily_rinaldi/Desktop/R Projects/SB Capstone"){
@@ -139,6 +140,13 @@ all_data$owner <- factor(all_data$owner)
 all_data <- filter(all_data, !is.na(pct_labor_force))
 ```
 
+## Abstract
+In this analysis, we tested the hypothesis that the demographic and economic characteristics of a particular zip code could predict the commercial patient volume at emergency department facilities located in that zip code. We found that approximately 22.6% of the variation in commercial patient volume for the facilities in our dataset could be attributed to the demographic and economic characteristics we identified in our analysis. 
+
+The resulting model can be used by our client, an emergency department staffing company, to target its business development efforts toward those facilities located in zip codes which indicate more patients who have commercial health insurance. According to our final linear regression model, facilities with the most commercial patients tend to be privately owned or nonprofit facilities located in zip codes with high wages, more Asian/Asian-American residents, and a large service and hospitality industry.
+
+The analysis was performed on a dataset consisting of all emergency department facilities in the state of California for which payer mix, demographic and economic data was available -- a total of 346 facilities. We obtained demographic and economic data on each facility's zip code from the 2010 Census and the latest American Community Survey. Because of the relatively small size of the dataset, we see this as a preliminary analysis and our conclusions should be tested on a more complete dataset. We believe our findings prove the value of this analysis and recommend that our client purchase or create a larger dataset to test the findings and, if necessary, train a new model that is more general to the entire country.
+
 ## Introduction
 
 ### The Problem
@@ -147,16 +155,17 @@ Public information about the patient population that visits a hospital’s emerg
 ### The Client
 The client is an emergency department physician staffing provider, which contracts with hospitals to staff physicians and performs all coding, billing, and collection functions related to the physicians’ services. The client’s main source of revenue is fee-for-service collections, and the revenue for a particular patient encounter is dependent on the health care coverage of the patient who was treated. 
 
-Most payers can be grouped into the following classes, in order from most expected revenue to least: Commercial Insurance, Medicare, Medicaid, and Self Pay. In the United States, emergency departments are subject to the Emergency Medical Treatment and Labor Act (EMTALA), which is a federal law that requires emergency department providers to stabalize and treat any patient that arrives, regardless of their ability to pay. Because treating each patient is costly for the client, operating at facilities where there are enough patients with insurance to cover provider staffing costs is paramount. Being able to accurately estimate the payer mix for potential client facilities would enable the company to focus business development efforts on those facilities located in geographic areas that indicate the most favorable payer mixes.
+Most payers can be grouped into the following classes, in order from most expected revenue to least: Commercial Insurance, Medicare, Medicaid, and Self Pay. In the United States, emergency departments are subject to the Emergency Medical Treatment and Labor Act (EMTALA), which is a federal law that requires emergency department providers to stabilize and treat any patient that arrives, regardless of their ability to pay. Because treating each patient is costly for the client, operating at facilities where there are enough patients with insurance to cover provider staffing costs is paramount. Being able to accurately estimate the payer mix for potential client facilities would enable the company to focus business development efforts on those facilities located in geographic areas that indicate the most favorable payer mixes.
 
 ### Data Sources
-1. Emergency Department Data By Expected Payer Source 2010-2014: This dataset contains the distribution of emergency department encounters and admits by expected payer for California hospitals years 2010-2014.
 
-2. 2010-2014 American Community Survey: The ACS collects information such as age, race, income, commute time to work, home value, veteran status, and other important data, and it is available by geographic area.
+***1. Emergency Department Data By Expected Payer Source 2010-2014:*** This dataset contains the distribution of emergency department encounters and admits by expected payer for California hospitals years 2010-2014.
 
-3. 2010 Census Demographic Profile: The Demographic Profile contains data on population characteristics including sex, age, race, household relationship, household type, group quarters population; and housing characteristics including occupancy and tenure.
+***2. 2010-2014 American Community Survey:*** The ACS collects information such as age, race, income, commute time to work, home value, veteran status, and other important data, and it is available by geographic area.
 
-### Example Data
+***3. 2010 Census Demographic Profile:*** The Demographic Profile contains data on population characteristics including sex, age, race, household relationship, household type, group quarters population; and housing characteristics including occupancy and tenure.
+
+### Final Dataset
 After cleaning the data and joining it into a single dataset, we have a dataframe of 66 variables with 346 observations. Each observation represents an emergency facility and the demographic and economic characteristics of the zip code in which it is located. A glimpse of the data is provided below.
 ```{r glimpse data}
 glimpse(all_data)
@@ -164,79 +173,149 @@ glimpse(all_data)
 
 
 ## Data Exploration
-The dataset contains many potentially predictive variables, so we plotted the relationship between each variable and our dependent variable. The following graphs split the variables into related categories to observe correlation with percent of commercial patients as well as collinearity with other similar variables.
+The dataset contains many potentially predictive variables, so we plotted the relationship between each variable and our dependent variable. The following graphs split the variables into related categories to observe correlation with percent of commercial patients as well as collinearity with other similar variables. Each point represents a single facility's proportion of patients with commercial insurance plotted against an economic or demographic statistic for the zip code in which that facility is located.
 
 We see that the scatterplot data is very noisy, but in most cases, the best fit lines confirm our intuition about the variables' relationships to the percent of commercial patients. 
 
-The graph below shows that a higher labor force participation rate indicates more commercial patients at emergency departments located in the same zip code. Interestingly, this also shows that the proportion of people over age 65 has a positive relationship with the percent of commercial patients, even though people over age 65 are eligible for Medicare coverage. Also, of the industries considered, only the sales and office jobs have a positive correlation with commercial patients.
+The graph below shows that a higher labor force participation rate indicates more commercial patients at emergency departments located in the same zip code. Because health insurance in the United States is so often tied to employment, more people in the labor force likely means more people with employer-sponsored health insurance. Interestingly, this also shows that the proportion of people over age 65 has a positive relationship with the percent of commercial patients, even though people over age 65 are eligible for Medicare coverage. Also, of the industries considered, only the sales and office jobs have a positive correlation with commercial patients, likely because these types of jobs may pay more or provide better health benefits than the other industries considered.
 
-```{r graph 1, echo = FALSE}
+```{r graph 1, fig.width = 7, echo = FALSE}
 
 #Plot all labor force and industry variables vs pct_comm
-labor_table <- select(all_data, year:location, pct_comm, pct_armed_forces, pct_construction, pct_labor_force, pct_sales_office, pct_service_ind, pct_transport_ind, pct_female_labforce, pct_over18, pct_over65, pct_unemployed)
-labor_table_long <- gather(labor_table, "stat", "value", pct_armed_forces:pct_unemployed)
-ggplot(labor_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+all_data <- ungroup(all_data)
+labor_table <- select(all_data, 
+                      "% Commercial Patients" = pct_comm, 
+                      "% of Labor Force in \nArmed Forces" = pct_armed_forces, 
+                      "% of Labor Force in \nConstruction Industry" = pct_construction, 
+                      "Labor Force \nParticipation Rate" = pct_labor_force, 
+                      "% of Labor Force in \nSales or Office Jobs" = pct_sales_office, 
+                      "% of Labor Force in \nService/Hospitality" = pct_service_ind, 
+                      "% of Labor Force in \nTransport Industry" = pct_transport_ind, 
+                      "Female Labor Force \nParticipation Rate" = pct_female_labforce, 
+                      "% of Population \nOver Age 18" = pct_over18, 
+                      "% of Population \nOver Age 65" = pct_over65, 
+                      "Unemployment Rate" = pct_unemployed)
+labor_table_long <- gather(labor_table, "Statistic", "Value", `% of Labor Force in \nArmed Forces`:`Unemployment Rate`)
+ggplot(labor_table_long, aes(x = Value, y = `% Commercial Patients`, col = `Statistic`, fill = `Statistic`)) + 
   geom_point(alpha = 0.3) + 
   geom_smooth(se = FALSE, size = 2, method = lm) + 
-  xlab("value (as % of population)") + 
-  ylab("percent commercial patients") +
-  ggtitle("Labor Force and Industry Statistics")
+  xlab("Statistic Value") + 
+  ylab("Percent Commercial Patients") +
+  ggtitle("Labor Force and Industry Statistics")+
+  theme(legend.key.size = unit(.8, "cm"))
+
+names(labor_table) <- sub("\n", "", names(labor_table))
+writeLines("Correlation with % Commercial Patients:")
+cor(labor_table[,-1], labor_table[,1])
 ```
 
-The following graph shows that more people on public assistance indicates fewer commercial patients at facilities in the same area. Also, the only line with a positive slope shows the percent of the population with private insurance. This may serve as confirmation that the Census and ACS data is truly representative of emergency department patients in the same zip code.
+The following graph shows that more people on public assistance indicates fewer commercial patients at facilities in the same area. People who are eligible for public assistance may not be employed or may have low incomes to be eligible for Medicaid, in which case they would not need commercial health insurance. Also, the only line with a positive slope shows the percent of the population with private insurance. This may serve as confirmation that the Census and ACS data is truly representative of emergency department patients in the same zip code, which is the entire basis of our analysis.
 
-```{r graph 2, echo = FALSE}
+```{r graph 2, fig.width = 7, echo = FALSE}
 #Plot all benefits and insurance variables vs pct_comm
-ben_table <- select(all_data, year:location, pct_comm, pct_no_ins, pct_public_ins, pct_private_ins, pct_SNAP, pct_wcash_assist, pct_wSSI, pct_poverty)
-ben_table_long <- gather(ben_table, "stat", "value", pct_no_ins:pct_poverty)
-ggplot(ben_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+ben_table <- select(all_data, 
+                    "% Commercial Patients" = pct_comm, 
+                    "% of Pop. without \nHealth Insurance" = pct_no_ins, 
+                    "% of Pop. with \nPublic Insurance" = pct_public_ins, 
+                    "% of Pop. with \nPrivate Health Insurance" = pct_private_ins, 
+                    "% of Pop. Receiving \nSNAP (Food Stamps)" = pct_SNAP, 
+                    "% of Pop. Receiving \nCash Assistance" = pct_wcash_assist, 
+                    "% of Pop. Receiving \nSupplemental Security Income" = pct_wSSI, 
+                    "% of Pop. Below the \nPoverty Line" = pct_poverty)
+ben_table_long <- gather(ben_table, "Statistic", "Value", `% of Pop. without \nHealth Insurance`:`% of Pop. Below the \nPoverty Line`)
+ggplot(ben_table_long, aes(x = Value, y = `% Commercial Patients`, col = `Statistic`, fill = `Statistic`)) + 
   geom_point(alpha = 0.3) + 
   geom_smooth(se = FALSE, size = 2, method = lm) + 
-  xlab("value (as % of population)") + 
-  ylab("percent commercial patients") + 
-  ggtitle("Insurance and Public Benefits Statistics")
+  xlab("Statistic Value") + 
+  ylab("percent commercial Patients") + 
+  ggtitle("Insurance and Public Benefits Statistics")+
+  theme(legend.key.size = unit(1, "cm"))
+
+names(ben_table) <- sub("\n", "", names(ben_table))
+writeLines("Correlation with % Commercial Patients:")
+cor(ben_table[,-1], ben_table[,1])
 ```
 
-The Race and Household Demographics graph below shows that populations with more Asians, and to a lesser extent more whites, may have more commercially insured individuals. Also, it appears that the proportion of family households headed by a single mother may have a strong inverse relationship with commercial insurance patients.
+The Race and Household Demographics graph below shows that populations with more Asians, and to a lesser extent more whites, may have more commercially insured individuals. Also, it appears that the proportion of family households headed by a single mother may have a strong inverse relationship with commercial insurance patients. This may be because single mother households with children are more likely to be eligible for Medicaid coverage.
 
-```{r graph 3, echo= FALSE}
+```{r graph 3, fig.width = 7, echo= FALSE}
 #Plot all race and household variables vs pct_comm
-race_table <- select(all_data, year:location, pct_comm, pct_asian, pct_black, pct_extfamily_houses, pct_group_qrts, pct_hisp, pct_house_wchildren, pct_married_houses, pct_nonhisp_wh, pct_nonrelative_houses, pct_pub_trans, pct_sing_mother_houses)
-race_table_long <- gather(race_table, "stat", "value", pct_asian:pct_sing_mother_houses)
-ggplot(race_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+race_table <- select(all_data, 
+                     "% Commercial Patients" = pct_comm, 
+                     "% Asian" = pct_asian, 
+                     "% Black" = pct_black, 
+                     "% of Households with \nExtended Families" = pct_extfamily_houses, 
+                     "% of Pop. Living in \nGroup Quarters" = pct_group_qrts, 
+                     "% Hispanic" = pct_hisp, 
+                     "% of Households with \nChildren Under 18" = pct_house_wchildren, 
+                     "% of Households with \nMarried Parents" = pct_married_houses, 
+                     "% Non-Hispanic Whites" = pct_nonhisp_wh, 
+                     "% of Households with \nNonrelatives" = pct_nonrelative_houses, 
+                     "% of Population Using \nPublic Transportation" = pct_pub_trans, 
+                     "% of Households Headed \nby a Single Mother" = pct_sing_mother_houses)
+race_table_long <- gather(race_table, "Statistic", "Value", `% Asian`:`% of Households Headed \nby a Single Mother`)
+ggplot(race_table_long, aes(x = Value, y = `% Commercial Patients`, col = `Statistic`, fill = `Statistic`)) + 
   geom_point(alpha = 0.3) + 
   geom_smooth(se = FALSE, size = 2, method = lm) + 
-  xlab("value (as % of population)") + 
-  ylab("percent commercial patients") + 
-  ggtitle("Race and Household Demographics")
+  xlab("Statistic Value") + 
+  ylab("Percent Commercial Patients") + 
+  ggtitle("Race and Household Demographics")+
+  theme(legend.key.size = unit(.8, "cm"))
+
+names(race_table) <- sub("\n", "", names(race_table))
+writeLines("Correlation with % Commercial Patients:")
+cor(race_table[,-1], race_table[,1])
 ```
 
 When observing the income distrubtions of a population, a positive correlation to commercially insured patients is not reached until household incomes exceed $75,000. 
 
-```{r graph 4, echo=FALSE}
+```{r graph 4, fig.width = 7, echo=FALSE}
 #Plot income distribution variables vs pct_comm
-inc_table2 <- select(all_data, year:location, pct_comm, ends_with("K", ignore.case = FALSE))
-inc_table2_long <- gather(inc_table2, "stat", "value", pct_under10K:pct_75to100K)
-ggplot(inc_table2_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+inc_table2 <- select(all_data, 
+                     "% Commercial Patients" = pct_comm,
+                     "% of Families with \nIncomes Under $10K" = pct_under10K,
+                     "% of Families with \nIncomes from $10-15K" = pct_10to15K,
+                     "% of Families with \nIncomes from $15-25K" = pct_15to25K,
+                     "% of Families with \nIncomes from $25-35K" = pct_25to35K,
+                     "% of Families with \nIncomes from $50-75K" = pct_50to75K,
+                     "% of Families with \nIncomes from $75-100K" = pct_75to100K)
+inc_table2_long <- gather(inc_table2, "Statistic", "Value", `% of Families with \nIncomes Under $10K`:`% of Families with \nIncomes from $75-100K`)
+ggplot(inc_table2_long, aes(x = Value, y = `% Commercial Patients`, col = `Statistic`, fill = `Statistic`)) + 
   geom_point(alpha = 0.3) + 
   geom_smooth(se = FALSE, size = 2, method = lm) + 
-  xlab("value (as % of population") + ylab("percent commercial patients") + 
-  ggtitle("Income Distribution Statistics")
+  xlab("Statistic value") + 
+  ylab("Percent Commercial Patients") + 
+  ggtitle("Income Distribution Statistics")+
+  theme(legend.key.size = unit(1, "cm"))
+
+names(inc_table2) <- sub("\n", "", names(inc_table2))
+writeLines("Correlation with % Commercial Patients:")
+cor(inc_table2[,-1], inc_table2[,1])
 ```
 
-As expected, higher median incomes for an area indicate more ER patients with commercial insurance.
+As expected, higher median incomes for an area indicate more ER patients with commercial insurance. Higher wages likely means more people that can afford the health benefits offered by their employers and fewer workers eligible for Medicaid.
 
-```{r graph 5, echo= FALSE}
+```{r graph 5, fig.width = 7, echo= FALSE}
 #Plot all median income or earnings variables vs pct_comm
-inc_table <- select(all_data, year:location, pct_comm, contains("income"), contains("earnings"))
-inc_table_long <- gather(inc_table, "stat", "value", med_househ_income:med_male_earnings)
-ggplot(inc_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
+inc_table <- select(all_data,
+                    "% Commercial Patients" = pct_comm,
+                    "Median Household \nIncome" = med_househ_income,
+                    "Median Earnings \nof Male Workers" = med_male_earnings,
+                    "Median Worker \nEarnings" = med_worker_earnings,
+                    "Mean Household \nIncome" = mn_househ_income,
+                    "Per Capita Income" = per_cap_income)
+inc_table_long <- gather(inc_table, "Statistic", "Value", `Median Household \nIncome`:`Per Capita Income`)
+ggplot(inc_table_long, aes(x = Value, y = `% Commercial Patients`, col = `Statistic`, fill = `Statistic`)) + 
   geom_point(alpha = 0.3) + 
   geom_smooth(se = FALSE, size = 2, method = lm) + 
-  xlab("value") + ylab("percent commercial patients") +
-  ggtitle("Median Income Statistics")
+  xlab("Statistic Value") + 
+  ylab("Percent Commercial Patients") +
+  ggtitle("Median Income Statistics")+
+  theme(legend.key.size = unit(1, "cm"))
 
-
+names(inc_table) <- sub("\n", "", names(inc_table))
+writeLines("Correlation with % Commercial Patients:")
+cor(inc_table[,-1], inc_table[,1])
 ```
 
 
@@ -252,7 +331,6 @@ library(leaps)
 #Prepare data for modeling
 #eliminate any unneeded columns that will not be used as predictors
 model_data <- all_data %>% 
-  ungroup() %>% 
   select(pct_comm, 
          MSSA_desig, 
          owner, 
@@ -263,7 +341,7 @@ regfit <- regsubsets(pct_comm ~ ., model_data, nvmax = 16)
 reg_sum <- summary(regfit)
 ```
 
-We selected the model size based on which model minimizes Mallow's Cp, a metric that is less biased toward overfitting by adding more variables, and then filtered the dataset to only those variables which are included in the best model. We then added dummy variables for the factor values of owner, which was one of the predictors chosen by regsubsets. 
+We selected the model size based on which model minimizes Mallow's C~p~, a metric that is less biased toward overfitting by adding more variables. We then filtered the dataset to only those variables which are included in the best model. Finally, we added dummy variables for the factor values of owner, which was one of the predictors chosen by regsubsets. 
 
 ```{r regfit output, echo = FALSE}
 plot(reg_sum$cp, xlab = "Number of Variables", ylab = "Cp", main = "Results of Regsubsets Model Selection")
@@ -271,7 +349,7 @@ best_num <- which.min(reg_sum$cp)
 points(best_num, reg_sum$cp[best_num], pch = best_num, col = "red")
 ```
 
-The model that minimizes Mallow's Cp has `r best_num` variables, and the dataset was filtered to include only these variables:
+The model that minimizes Mallow's C~p~ has `r best_num` variables, and the dataset was filtered to include only these variables:
 ```{r filter variables, echo = FALSE}
 names(coef(regfit, best_num))
 
@@ -289,7 +367,6 @@ model_filtered2 <- tbl_df(model.matrix( ~ ., model.frame(~., data = model_filter
 ### Remove highly correlated variables
 We used the caret package to identify and remove any highly correlated variables that still remain in our dataset, with a cutoff point of 0.75.
 ```{r cor}
-#remove highly correlated variables, excluding dummy variables
 modelCor <- cor(model_filtered2[, -(1:4)])
 summary(modelCor[upper.tri(modelCor)])
 
@@ -300,7 +377,6 @@ model_filtered3 <- model_filtered2[, -highlyCorVar]
 ### Create training and testing datasets
 We used the caret package's createDataPartition function to perform a .7/.3 split of our dataset, which is stratified based on the value of our dependent variable, pct_comm.
 ```{r sampling}
-#Create training and testing data sets
 set.seed(50)
 inTraining <- createDataPartition(model_filtered3$pct_comm, p = .7, list = FALSE)
 training <- model_filtered3[inTraining,]
@@ -352,7 +428,7 @@ postResample(testFit1, testingTransformed$pct_comm)
 
 ```
 
-The test result's Rsquared is similar to the model Rsquared, but there may be room for improvement. Removing all insignificant variables from Fit1 and training a new model yields the following results:
+The test result's R^2^ is similar to the model R^2^, but there may be room for improvement. Removing all insignificant variables from Fit1 and training a new model yields the following results:
 
 ```{r, echo = FALSE}
 set.seed(50)
@@ -369,7 +445,7 @@ postResample(testFit2, testingTransformed$pct_comm)
 
 ```
 
-Interestingly, removing insignificant variables decreased both the Multiple R-squared and the Adjusted R-squared. It also resulted in a lower Rsquared when predicting the test set.
+Interestingly, removing insignificant variables decreased both the Multiple R^2^ and the Adjusted R^2^. It also resulted in a lower R^2^ when predicting the test set.
 
 ### 2. Stochastic Gradient Boosting (gbm)
 
@@ -403,7 +479,7 @@ testGBM1 <- predict(FitGBM1, testingTransformed)
 postResample(testGBM1, testingTransformed$pct_comm)
 ```
 
-The best tune has a model Rsquared of `r FitGBM1$results[row.names(FitGBM1$bestTune), "Rsquared"]` but a much lower Rsquared of `r postResample(testGBM1, testingTransformed$pct_comm)["Rsquared"]` when predicting the test set. This is likely a result of overfitting the GBM model to the training set.
+The best tune has a model R^2^ of `r round(FitGBM1$results[row.names(FitGBM1$bestTune), "Rsquared"],3)` but a much lower R^2^ of `r round(caret::postResample(testGBM1, testingTransformed$pct_comm)["Rsquared"],3)` when predicting the test set. This is likely a result of overfitting the GBM model to the training set.
 
 According to caret function varImp, the most important variables in the FitGBM1 model are as follows:
 
@@ -425,13 +501,14 @@ FitGBM2 <- train(pct_comm ~ med_male_earnings + pct_public_ins + pct_black + pct
 FitGBM2$bestTune
 ```
 
+
 Test set prediction results:
 ```{r test GBM2, echo = FALSE}
 testGBM2 <- predict(FitGBM2, testingTransformed)
 postResample(testGBM2, testingTransformed$pct_comm)
 ```
 
-The Rsquared of the best tune increased in this model, as did the Rsquared from predicting the test set, but the testing Rsquared is still much lower than that obtained using the initial linear regression model.
+The R^2^ of the best tune increased in this model, as did the R^2^ from predicting the test set, but the testing R^2^ is still much lower than that obtained using the initial linear regression model.
 
 ### Analysis of results
 
@@ -443,14 +520,37 @@ The following scatterplot shows the predicted and actual values of the dependent
 plot(testFit1, testingTransformed$pct_comm, main = "Results of Linear Regression Model", xlab = "Predicted pct_comm", ylab = "Actual pct_comm")
 ```
 
-While the model only explains a fraction of the variance in the proportion of commercial patients at California emergency rooms, it can provide the client with a starting point of where to focus its business development and sales efforts.
+At the cross validated R^2^ of `r round(Fit1$results[1, "Rsquared"],3)`, the model only explains a fraction of the variance in the proportion of commercial patients at California emergency rooms. Even so, it can provide the client with a starting point of where to focus its business development and sales efforts. 
+
+According to the model, facilities with the most commercial patients are likely privately owned or nonprofit facilities located in zip codes with high wages, more Asian/Asian-American residents, and a large service and hospitality industry. The following coefficient summary and variable importance chart show the impact each variable has on the final model:
+
+```{r coef sum, fig.width = 7, echo=FALSE}
+writeLines("Linear Model Coefficient Summary:\n")
+summary(Fit1)$coefficients
+
+Fit1_varplot <- plot(varImp(Fit1), main = "Linear Model Variable Importance")
+Fit1_vars <- c("% Hispanic (pct_hisp)", "% in Sales or Office Jobs (pct_sales_office)", "% Black (pct_black)", "% with Public Health Insurance (pct_public_ins)", "% Vacant Houses (pct_vacant_houses)", "Nonprofit Facility Owner (ownerNonprofit)", "Total Population (tot_pop)", "% Asian (pct_asian)", "Public or Community Facility (ownerPublic)", "% in Service/Hospitality Industry (pct_service_ind)", "% Earning $75-100K (pct_75to100K)", "Median Male Worker Earnings (med_male_earnings)")
+Fit1_varplot$y.limits <- Fit1_vars
+Fit1_varplot$x.limits <- c(0, 107)
+Fit1_varplot
+
+```
+
+***Median Male Earnings:*** The most significant predictor is the median earnings of male workers - the positive coefficient on this variable indicates facilities in zip codes with higher median male earnings have more commercial patients. Similarly, the proportion of workers earning $75,000 to 100,000 also indicates more commercial patients. This result is not surprising - more people in an area with higher paying jobs likely means more people who receive and are able to afford the health benefits offered by their employers.
+
+***Service or Hospitality Industry Workers:*** An initially counter-intuitive predictor of higher commercial patient volume is the percent of the labor force employed in the service or hospitality industry. More workers in an industry that is not known for high wages or great benefits would seem to predict fewer emergency department patients with commercial health insurance; instead, the opposite is true. It is possible that the proportion of service industry workers tells us more about other residents in the area than about those indicated by the statistic. Perhaps zip codes with vibrant restaurant and hotel industries are desirable areas for higher-income individuals and families to reside, and it is these residents presenting at emergency departments with commercial insurance.
+
+***Facility Ownership:*** The only predictor in our model that is related to the facility itself rather than the zip code in which it is located is the ownership of the facility. The model's baseline identifies an investor-owned facility, while non-profit and public ownership each negatively affect the expected commercial patient volume compared to that baseline. Public or community hospitals tend to serve a lower-income population and, along with non-profit hospitals, may have more generous charity policies. Uninsured patients with less-emergent health issues may decide to visit these emergency departments rather than privately owned facilities located closer to their homes if they are concerned about the cost of services.
+
+***Asian Population:*** Another significant predictor is the proportion of the population that self-identifies as Asian or Asian-American. In this model, a higher proportion of Asians indicates more commercial patients. According to the 2010 Census, 30.9% of Asians or Asian-Americans in the United States reside in the state of California. As recommended in our conclusion, further study should be done to determine whether all of our findings still stand when applied to facilities outside of California.
+
 
 ## Conclusion
 
-In conclusion, we would recommend that the client take the following action as a result of this analysis:
+We would recommend that the client take the following action as a result of this analysis:
 
-1. Due to the limited scope of this publicly available dataset, which includes only emergency facilities in California, the client should test the model on its own facilities to see if the results are similar.
+1. Due to the limited scope and small sample size of this publicly available dataset, which includes only emergency facilities in California, the client should identify a larger, more complete dataset of emergency department facilities in the United States. A dataset may be available for purchase, or the client could create its own dataset using data from its own client facilities. The client should test the current model's predictions on this larger dataset and, if necessary, train a new predictive model using the larger dataset.
 
-2. The client should consider whether the results pertain to all states or only those which also expanded Medicaid coverage, as California did in 2014. The client could run a similar analysis using Medicaid expansion as an additional predictor.
+2. The client should consider whether the results of this or any predictive model pertain to all states or only those which also expanded Medicaid coverage, as California did in 2014. The client could run a similar analysis using Medicaid expansion as an additional predictor. In states that expanded Medicaid, it is possible that a significant number of workers who are offered commercial health benefits through their employer could be eligible for and elect to enroll in Medicaid instead. This would replace commercial patient volume with Medicaid volume at emergency department facilities. 
 
-3. Further study should be done to determine whether the population residing in a facility's zip code is the best representation of its client base. A potential analysis could be done to match each zip code to its nearest emergency room to better capture the entire population which may present at the facility. This could improve results, given that many zip codes represent a relatively small geographic area, which may or may not include an emergency facility.
+3. Further study should be done to determine whether the population residing in a facility's zip code is the best available representation of its patient base. A potential analysis could be done to match each zip code to its nearest emergency room to better capture the entire population which may present at the facility. This could improve results, given that many zip codes represent a relatively small geographic area, which may or may not include an emergency facility. 

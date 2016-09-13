@@ -127,54 +127,6 @@ all_data$owner <- factor(all_data$owner)
 #Remove four facilities located in zip codes for which economic survey data is not available
 all_data <- filter(all_data, !is.na(pct_labor_force))
 
-#Plot all labor force and industry variables vs pct_comm
-labor_table <- select(all_data, year:location, pct_comm, pct_armed_forces, pct_construction, pct_labor_force, pct_sales_office, pct_service_ind, pct_transport_ind, pct_female_labforce, pct_over18, pct_over65, pct_unemployed)
-labor_table_long <- gather(labor_table, "stat", "value", pct_armed_forces:pct_unemployed)
-ggplot(labor_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
-  geom_point(alpha = 0.3) + 
-  geom_smooth(se = FALSE, size = 2, method = lm) + 
-  xlab("value (as % of population)") + 
-  ylab("percent commercial patients") +
-  ggtitle("Labor Force and Industry Statistics")
-
-#Plot all benefits and insurance variables vs pct_comm
-ben_table <- select(all_data, year:location, pct_comm, pct_no_ins, pct_public_ins, pct_private_ins, pct_SNAP, pct_wcash_assist, pct_wSSI, pct_poverty)
-ben_table_long <- gather(ben_table, "stat", "value", pct_no_ins:pct_poverty)
-ggplot(ben_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
-  geom_point(alpha = 0.3) + 
-  geom_smooth(se = FALSE, size = 2, method = lm) + 
-  xlab("value (as % of population)") + 
-  ylab("percent commercial patients") + 
-  ggtitle("Insurance and Public Benefits Statistics")
-
-#Plot all race and household variables vs pct_comm
-race_table <- select(all_data, year:location, pct_comm, pct_asian, pct_black, pct_extfamily_houses, pct_group_qrts, pct_hisp, pct_house_wchildren, pct_married_houses, pct_nonhisp_wh, pct_nonrelative_houses, pct_pub_trans, pct_sing_mother_houses)
-race_table_long <- gather(race_table, "stat", "value", pct_asian:pct_sing_mother_houses)
-ggplot(race_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
-  geom_point(alpha = 0.3) + 
-  geom_smooth(se = FALSE, size = 2, method = lm) + 
-  xlab("value (as % of population)") + 
-  ylab("percent commercial patients") + 
-  ggtitle("Race and Household Demographics")
-
-#Plot all median income or earnings variables vs pct_comm
-inc_table <- select(all_data, year:location, pct_comm, contains("income"), contains("earnings"))
-inc_table_long <- gather(inc_table, "stat", "value", med_househ_income:med_male_earnings)
-ggplot(inc_table_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
-  geom_point(alpha = 0.3) + 
-  geom_smooth(se = FALSE, size = 2, method = lm) + 
-  xlab("value") + ylab("percent commercial patients") +
-  ggtitle("Median Income Statistics")
-
-#Plot income distribution variables vs pct_comm
-inc_table2 <- select(all_data, year:location, pct_comm, ends_with("K", ignore.case = FALSE))
-inc_table2_long <- gather(inc_table2, "stat", "value", pct_under10K:pct_75to100K)
-ggplot(inc_table2_long, aes(x = value, y = pct_comm, col = stat, fill = stat)) + 
-  geom_point(alpha = 0.3) + 
-  geom_smooth(se = FALSE, size = 2, method = lm) + 
-  xlab("value") + ylab("percent commercial patients") + 
-  ggtitle("Income Distribution Statistics")
-
 # MODELING
 
 library(caret)
@@ -250,8 +202,6 @@ Fit1$results
 #Test linear model Fit1
 testFit1 <- predict(Fit1, testingTransformed)
 postResample(testFit1, testingTransformed$pct_comm)
-
-plot(testFit1, testingTransformed$pct_comm)
 
 #Remove insignificant variables and train a second model
 set.seed(50)
