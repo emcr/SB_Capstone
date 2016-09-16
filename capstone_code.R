@@ -160,7 +160,7 @@ model_filtered <- tbl_df(cbind(pct_comm = model_data$pct_comm,
                                model_data[best_vars[4:14]]))
 
 
-#Create dummy variables for MSSA_design and owner categories -- why is intercept column created?
+#Create dummy variables for MSSA_design and owner categories
 model_filtered2 <- tbl_df(model.matrix( ~ ., model.frame(~., data = model_filtered, na.action = na.pass)))
 
 #remove highly correlated variables, excluding dummy variables
@@ -176,7 +176,7 @@ inTraining <- createDataPartition(model_filtered3$pct_comm, p = .7, list = FALSE
 training <- model_filtered3[inTraining,]
 testing <- model_filtered3[-inTraining,]
 
-#Use bagged trees preprocessing method to impute NAs found in MSSA_desig and owner variables
+#Use bagged trees preprocessing method to impute NAs found in owner variable
 impute_NAs <- preProcess(training[,-1], method = "bagImpute")
 
 set.seed(50)
@@ -245,6 +245,6 @@ FitGBM2 <- train(pct_comm ~ med_male_earnings + pct_public_ins + pct_black + pct
                  verbose = FALSE,
                  tuneGrid = gbmGrid)
 
-#Test FitGBM3
+#Test FitGBM2
 testGBM2 <- predict(FitGBM2, testingTransformed)
 postResample(testGBM2, testingTransformed$pct_comm)
