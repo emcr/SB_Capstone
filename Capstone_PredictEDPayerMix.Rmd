@@ -1,7 +1,7 @@
 ---
 title: "Predicting Emergency Room Payer Mix"
 author: "Emily Rinaldi"
-date: "September 13, 2016"
+date: "September 16, 2016"
 output: word_document
 
 ---
@@ -206,7 +206,7 @@ ggplot(labor_table_long, aes(x = Value, y = `% Commercial Patients`, col = `Stat
 
 names(labor_table) <- sub("\n", "", names(labor_table))
 
-knitr::kable(cor(labor_table[,-1], labor_table[,1]), caption = "Correlation with % Commercial Patients:")
+knitr::kable(cor(labor_table[,-1], labor_table[,1]), caption = "Correlation with % Commercial Patients:", col.names = "Correlation")
 ```
 
 The following graph shows that more people on public assistance indicates fewer commercial patients at facilities in the same area. People who are eligible for public assistance may not be employed or may have incomes low enough to be eligible for Medicaid, in which case they would not need commercial health insurance. Also, the only line with a positive slope shows the percent of the population with private insurance. This may serve as confirmation that the Census and ACS data is truly representative of emergency department patients in the same zip code, which is the entire basis of our analysis.
@@ -233,7 +233,7 @@ ggplot(ben_table_long, aes(x = Value, y = `% Commercial Patients`, col = `Statis
 
 names(ben_table) <- sub("\n", "", names(ben_table))
 
-knitr::kable(cor(ben_table[,-1], ben_table[,1]), caption = "Correlation with % Commercial Patients:")
+knitr::kable(cor(ben_table[,-1], ben_table[,1]), caption = "Correlation with % Commercial Patients:", col.names = "Correlation")
 ```
 
 The Race and Household Demographics graph below shows that populations with more Asians, and to a lesser extent more whites, may have more commercially insured individuals. Also, it appears that the proportion of family households headed by a single mother may have a strong inverse relationship with commercial insurance patients. This may be because single mother households with children are more likely to be eligible for Medicaid coverage.
@@ -264,7 +264,7 @@ ggplot(race_table_long, aes(x = Value, y = `% Commercial Patients`, col = `Stati
 
 names(race_table) <- sub("\n", "", names(race_table))
 
-knitr::kable(cor(race_table[,-1], race_table[,1]), caption = "Correlation with % Commercial Patients:")
+knitr::kable(cor(race_table[,-1], race_table[,1]), caption = "Correlation with % Commercial Patients:", col.names = "Correlation")
 ```
 
 When observing the income distributions of a population, a positive correlation to commercially insured patients is not reached until household incomes exceed $75,000. 
@@ -290,7 +290,7 @@ ggplot(inc_table2_long, aes(x = Value, y = `% Commercial Patients`, col = `Stati
 
 names(inc_table2) <- sub("\n", "", names(inc_table2))
 
-knitr::kable(cor(inc_table2[,-1], inc_table2[,1]), caption = "Correlation with % Commercial Patients:")
+knitr::kable(cor(inc_table2[,-1], inc_table2[,1]), caption = "Correlation with % Commercial Patients:", col.names = "Correlation")
 ```
 
 As expected, higher median incomes for an area indicate more ER patients with commercial insurance. Higher wages likely means more people that can afford the health benefits offered by their employers and fewer workers eligible for Medicaid.
@@ -315,7 +315,7 @@ ggplot(inc_table_long, aes(x = Value, y = `% Commercial Patients`, col = `Statis
 
 names(inc_table) <- sub("\n", "", names(inc_table))
 
-knitr::kable(cor(inc_table[,-1], inc_table[,1]), caption = "Correlation with % Commercial Patients:")
+knitr::kable(cor(inc_table[,-1], inc_table[,1]), caption = "Correlation with % Commercial Patients:", col.names = "Correlation")
 ```
 
 
@@ -364,7 +364,7 @@ model_filtered <- tbl_df(cbind(pct_comm = model_data$pct_comm,
 model_filtered2 <- tbl_df(model.matrix( ~ ., model.frame(~., data = model_filtered, na.action = na.pass)))
 ```
 
-### Remove Righly Correlated Variables
+### Remove Highly Correlated Variables
 We used the caret package to identify and remove any highly correlated variables that still remain in our dataset, with a cutoff point of 0.75.
 ```{r cor}
 modelCor <- cor(model_filtered2[, -(1:4)])
