@@ -141,11 +141,11 @@ all_data <- filter(all_data, !is.na(pct_labor_force))
 ```
 
 ## Abstract
-In this analysis, we tested the hypothesis that the demographic and economic characteristics of a particular zip code could predict the commercial patient proportion of total volume at emergency department facilities located in that zip code. We found that approximately 22.6% of the variation in commercial patient volume for the facilities in our dataset could be attributed to the demographic and economic characteristics we identified in our analysis. 
+In this analysis, we tested the hypothesis that the demographic and economic characteristics of a particular zip code can predict the commercial patient proportion of total volume at emergency department facilities located in that zip code. We found that approximately 22.6% of the variation in commercial patient volume for the facilities in our dataset can be attributed to the demographic and economic characteristics we identified in our analysis. 
 
-The resulting model can be used by our client, an emergency department staffing company, to target its business development efforts toward those facilities located in zip codes which indicate more patients who have commercial health insurance. According to our final linear regression model, facilities with the most commercial patients tend to be privately owned or nonprofit facilities located in zip codes with high wages, more Asian/Asian-American residents, and a large service and hospitality industry.
+The resulting model can be used by our client, an emergency department staffing company, to target its business development efforts toward those facilities located in zip codes which indicate more patients who have commercial health insurance. According to our final linear regression model, facilities with the most commercial patients tend to be privately owned or nonprofit facilities located in zip codes with higher wages, more Asian/Asian-American residents, and a large service and hospitality industry.
 
-The analysis was performed on a dataset consisting of all emergency department facilities in the state of California for which payer mix, demographic and economic data was available -- a total of 346 facilities. We obtained demographic and economic data on each facility's zip code from the 2010 Census and the latest American Community Survey. Because of the relatively small size of the dataset, we see this as a preliminary analysis and our conclusions should be tested on a more complete dataset. We believe our findings prove the value of this analysis and recommend that our client purchase or create a larger dataset to test the findings and, if necessary, train a new model that is more general to the entire country.
+The analysis was performed on a dataset consisting of all emergency department facilities in the state of California for which payer mix, demographic, and economic data was available -- a total of 346 facilities. We obtained demographic and economic data on each facility's zip code from the 2010 Census and the latest American Community Survey. Because of the relatively small size of the dataset, we see this as a preliminary analysis, and our conclusions should be tested on a more complete dataset. We believe our findings prove the value of this analysis and recommend that our client purchase or create a larger dataset to test the findings and, if necessary, train a new model that is more general to the entire country.
 
 ## Introduction
 
@@ -209,7 +209,7 @@ names(labor_table) <- sub("\n", "", names(labor_table))
 knitr::kable(cor(labor_table[,-1], labor_table[,1]), caption = "Correlation with % Commercial Patients:")
 ```
 
-The following graph shows that more people on public assistance indicates fewer commercial patients at facilities in the same area. People who are eligible for public assistance may not be employed or may have low incomes to be eligible for Medicaid, in which case they would not need commercial health insurance. Also, the only line with a positive slope shows the percent of the population with private insurance. This may serve as confirmation that the Census and ACS data is truly representative of emergency department patients in the same zip code, which is the entire basis of our analysis.
+The following graph shows that more people on public assistance indicates fewer commercial patients at facilities in the same area. People who are eligible for public assistance may not be employed or may have incomes low enough to be eligible for Medicaid, in which case they would not need commercial health insurance. Also, the only line with a positive slope shows the percent of the population with private insurance. This may serve as confirmation that the Census and ACS data is truly representative of emergency department patients in the same zip code, which is the entire basis of our analysis.
 
 ```{r graph 2, fig.width = 7, echo = FALSE}
 #Plot all benefits and insurance variables vs pct_comm
@@ -341,7 +341,7 @@ regfit <- regsubsets(pct_comm ~ ., model_data, nvmax = 16)
 reg_sum <- summary(regfit)
 ```
 
-We selected the model size based on which model minimizes Mallow's C~p~, a metric that is less biased toward overfitting by adding more variables. We then filtered the dataset to only those variables which are included in the best model. Finally, we added dummy variables for the factor values of owner, which was one of the predictors chosen by regsubsets. 
+We selected the model size based on which model minimizes Mallow's C~p~, a metric that is less biased toward overfitting by adding more variables than other model performance metrics. We then filtered the dataset to only those variables which are included in the best model. Finally, we added dummy variables for the factor values of owner, which was one of the predictors chosen by regsubsets. 
 
 ```{r regfit output, echo = FALSE}
 plot(reg_sum$cp, xlab = "Number of Variables", ylab = "Cp", main = "Results of Regsubsets Model Selection")
@@ -364,7 +364,7 @@ model_filtered <- tbl_df(cbind(pct_comm = model_data$pct_comm,
 model_filtered2 <- tbl_df(model.matrix( ~ ., model.frame(~., data = model_filtered, na.action = na.pass)))
 ```
 
-### Remove highly correlated variables
+### Remove Righly Correlated Variables
 We used the caret package to identify and remove any highly correlated variables that still remain in our dataset, with a cutoff point of 0.75.
 ```{r cor}
 modelCor <- cor(model_filtered2[, -(1:4)])
@@ -374,7 +374,7 @@ highlyCorVar <- findCorrelation(modelCor, cutoff = 0.75) + 4
 model_filtered3 <- model_filtered2[, -highlyCorVar]
 ```
 
-### Create training and testing datasets
+### Create Training and Testing Datasets
 We used the caret package's createDataPartition function to perform a .7/.3 split of our dataset, which is stratified based on the value of our dependent variable, pct_comm.
 ```{r sampling}
 set.seed(50)
@@ -384,7 +384,7 @@ testing <- model_filtered3[-inTraining,]
 
 ```
 
-### Imputation of NAs
+### Impute Missing Values
 Because our dataset is relatively small, we did not want to exclude any observations just because one predictor's value was missing. The owner variable contained 10 missing values which we filled using the bagged trees imputation method.
 
 ```{r imputation}
@@ -451,7 +451,7 @@ Interestingly, removing insignificant variables decreased both the Multiple R^2^
 
 In attempt to improve upon the linear regression models explained above, we tested training the model with interactions of every combination of two terms. None of these interactions were significant. To automate the testing of higher degree interactions, we used the caret package to train a stochastic gradient boosting model, with method set to "gbm". 
 
-The GBM model finds the model that maximizes Rsquared value across various tuning parameters. The results of the best tune and its prediction on the testing set are as follows:
+The GBM model finds the model that maximizes R^2^ value across various tuning parameters. The results of the best tune and its prediction on the testing set are as follows:
 
 ```{r gbm1, include = FALSE}
 #GBM Model attempt to automate interactions
@@ -510,7 +510,7 @@ postResample(testGBM2, testingTransformed$pct_comm)
 
 The R^2^ of the best tune increased in this model, as did the R^2^ from predicting the test set, but the testing R^2^ is still much lower than that obtained using the initial linear regression model.
 
-### Analysis of results
+### Analysis of Results
 
 Our best result in predicting the percent of emergency department patients with commercial insurance was achieved with the first linear model we tested. This model included all of the variables remaining after filtering our dataset for the predictors indicated by the regsubsets algorithm and then removing highly correlated predictors.
 
