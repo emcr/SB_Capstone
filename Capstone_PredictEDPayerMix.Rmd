@@ -141,7 +141,7 @@ all_data <- filter(all_data, !is.na(pct_labor_force))
 ```
 
 ## Abstract
-In this analysis, we tested the hypothesis that the demographic and economic characteristics of a particular zip code could predict the commercial patient volume at emergency department facilities located in that zip code. We found that approximately 22.6% of the variation in commercial patient volume for the facilities in our dataset could be attributed to the demographic and economic characteristics we identified in our analysis. 
+In this analysis, we tested the hypothesis that the demographic and economic characteristics of a particular zip code could predict the commercial patient proportion of total volume at emergency department facilities located in that zip code. We found that approximately 22.6% of the variation in commercial patient volume for the facilities in our dataset could be attributed to the demographic and economic characteristics we identified in our analysis. 
 
 The resulting model can be used by our client, an emergency department staffing company, to target its business development efforts toward those facilities located in zip codes which indicate more patients who have commercial health insurance. According to our final linear regression model, facilities with the most commercial patients tend to be privately owned or nonprofit facilities located in zip codes with high wages, more Asian/Asian-American residents, and a large service and hospitality industry.
 
@@ -227,7 +227,7 @@ ggplot(ben_table_long, aes(x = Value, y = `% Commercial Patients`, col = `Statis
   geom_point(alpha = 0.3) + 
   geom_smooth(se = FALSE, size = 2, method = lm) + 
   xlab("Statistic Value") + 
-  ylab("percent commercial Patients") + 
+  ylab("Percent commercial Patients") + 
   ggtitle("Insurance and Public Benefits Statistics")+
   theme(legend.key.size = unit(1, "cm"))
 
@@ -267,7 +267,7 @@ names(race_table) <- sub("\n", "", names(race_table))
 knitr::kable(cor(race_table[,-1], race_table[,1]), caption = "Correlation with % Commercial Patients:")
 ```
 
-When observing the income distrubtions of a population, a positive correlation to commercially insured patients is not reached until household incomes exceed $75,000. 
+When observing the income distributions of a population, a positive correlation to commercially insured patients is not reached until household incomes exceed $75,000. 
 
 ```{r graph 4, fig.width = 7, echo=FALSE}
 #Plot income distribution variables vs pct_comm
@@ -498,7 +498,7 @@ FitGBM2 <- train(pct_comm ~ med_male_earnings + pct_public_ins + pct_black + pct
                  verbose = FALSE,
                  tuneGrid = gbmGrid)
 
-FitGBM2$bestTune
+FitGBM2$results[row.names(FitGBM2$bestTune),]
 ```
 
 
