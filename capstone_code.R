@@ -11,9 +11,9 @@ library(tidyr)
 library(ggplot2)
 
 #Define data sources
-census_file <- "2010_Census_Demographics_CA.csv"
-econ_surv_file <- "ACS_2014_Economic_Estimates_CA.csv"
-facilities_file <- "CA_ED_Encounters_by_Expected_Payer.csv"
+census_file <- "Data Sources/2010_Census_Demographics_CA.csv"
+econ_surv_file <- "Data Sources/ACS_2014_Economic_Estimates_CA.csv"
+facilities_file <- "Data Sources/CA_ED_Encounters_by_Expected_Payer.csv"
 
 #Read in census demographic data into dataframe
 census <- read_csv(census_file, skip = 2, 
